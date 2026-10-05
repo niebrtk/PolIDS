@@ -148,11 +148,52 @@ table.data td.num { text-align: right; font-family: var(--mono); }
 .maplabel { background: none; border: 0; }
 .maplabel > div { transform: translate(-50%, -50%); text-align: center; white-space: nowrap; font: 11px var(--mono); color: #cfd8cf; text-shadow: 0 0 3px #000, 0 0 3px #000; }
 .maplabel .freq { font-size: 12px; padding: 0 4px; border-width: 1px; }
+.maplabel .freq.on { box-shadow: none; background: #9dff6e; border-color: #1d5c0c; color: #000; }
 .maplabel .firname { color: #6b756b; font-size: 12px; }
 
 /* AERODROME / AWOS */
-.awos { display: grid; grid-template-columns: 290px 1fr 340px; gap: 12px; align-items: start; }
-@media (max-width: 1350px) { .awos { grid-template-columns: 290px 1fr; } .awos > :last-child { grid-column: 1 / -1; } }
+/* AERODROME: wszystko na jednym ekranie; długie listy przewijają się w swoich okienkach */
+.ad-pane { display: flex; flex-direction: column; overflow: hidden; padding: 8px 12px; }
+.ad-pane > .toolbar { margin-bottom: 6px; }
+.ad-pane .content { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.ad-pane .metar-head { margin-bottom: 8px; padding: 4px 10px; }
+.ad-grid { flex: 1; min-height: 0; display: grid; gap: 8px;
+  grid-template-columns: 232px minmax(360px, 1.15fr) minmax(290px, 1fr) minmax(250px, 310px); }
+.ad-col { display: flex; flex-direction: column; gap: 8px; min-height: 0; min-width: 0; }
+.ad-col > .card { min-height: 0; display: flex; flex-direction: column; padding: 6px 10px; }
+.ad-col > .card h3 { margin-bottom: 4px; flex: none; }
+.ad-col > .card.grow { flex: 1 1 0; }
+.ad-col > .card.part { flex: 0 1 auto; max-height: 40%; }
+.ad-col .scroll { flex: 1; min-height: 0; overflow: auto; }
+.ad-wind { text-align: center; flex: none !important; }
+.ad-wind .windrose { width: 200px; height: 200px; }
+.ad-wind .big { font: 26px var(--mono); color: #fff; }
+.ad-wind .rwy-use { margin-top: 6px; padding: 4px; }
+.ad-wind .rwy-use .pair b { font-size: 32px; }
+.ad-col .notam { margin-bottom: 6px; padding: 4px 8px; }
+.ad-col .notam pre { font-size: 12px; margin: 2px 0 0; white-space: pre-wrap; }
+.ad-col .checklist { font-size: 13px; }
+.ad-col .chk-row { padding: 2px 2px; }
+.ad-col .chk-section { margin: 6px 0 2px; }
+.ad-col .ad-taf { font-size: 13px; }
+.ad-col table.data.rwy-table { font-size: 14px; }
+.ad-col table.data.rwy-table td, .ad-col table.data.rwy-table th { padding: 2px 4px; }
+.ad-col table.data.traffic td { font-size: 12px; padding: 1px 5px; }
+.ad-col table.data.traffic th { font-size: 11px; padding: 2px 5px; }
+.ad-col .ad-traffic h4 { margin: 4px 0 2px; }
+.ad-col table.data.rwy-table td.rwy { font-size: 17px; }
+.values.compact { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; flex: none; }
+.values.compact .card { padding: 3px 8px; }
+.values .label { color: var(--green-text); font-size: 11px; font-variant: small-caps; letter-spacing: 1px; }
+.values .val { font: 20px var(--mono); color: #fff; line-height: 1.25; }
+.values .val .sm { font-size: 14px; }
+.values .hint { font-size: 11px; display: block; }
+@media (max-width: 1250px), (max-height: 640px) {
+  .ad-pane { overflow: auto; }
+  .ad-grid { grid-template-columns: 232px minmax(0, 1fr); }
+  .ad-col > .card.grow, .ad-col > .card.part { flex: none; max-height: none; }
+  .ad-col .scroll { max-height: 420px; }
+}
 .metar-head { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; background: var(--panel); border: 1px solid var(--line); padding: 6px 10px; margin-bottom: 12px; }
 .metar-head .wx { flex: 1; min-width: 300px; }
 .metar-head .obs { color: var(--muted); font: 13px var(--mono); }
@@ -165,8 +206,6 @@ table.data td.num { text-align: right; font-family: var(--mono); }
 .lvp-prep { color: var(--warn); border-color: var(--warn); }
 .lvp-lvp { color: #fff; background: #b0201a; border-color: #ff5a4a; box-shadow: 0 0 10px rgba(255,60,40,.6); }
 .lvp[data-tip]:hover::after { left: auto; right: 0; }
-.awos .big { font-family: var(--mono); font-size: 34px; color: #fff; }
-.awos .label { color: var(--green-text); font-size: 12px; font-variant: small-caps; letter-spacing: 1px; }
 .values { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px; }
 .values .card { padding: 8px; }
 /* AERODROME: tabela pasów zwarta, duże znaki */
@@ -280,8 +319,8 @@ table.data.traffic a.cs { color: var(--cyan); font-weight: 700; text-decoration:
 .emergency li.sub { margin-top: 6px; }
 .emergency li.sub > ul { margin-top: 3px; }
 .emergency .em-sub { color: var(--muted); margin: -6px 0 10px; font-variant: small-caps; }
-.em-sections { columns: 2 460px; column-gap: 28px; }
-.em-sections section { break-inside: avoid; margin-bottom: 6px; }
+.em-sections { max-width: 980px; }
+.em-sections section { margin-bottom: 6px; }
 .assist { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 8px; }
 .assist span { padding: 4px 10px; border: 1px solid var(--bad); background: #2a0d0d; color: #f3d0d0; font-variant: small-caps; font-size: 15px; }
 .assist b { color: #fff; font-size: 18px; }
@@ -357,3 +396,35 @@ table.callsigns td.minor { font-size: 12px; color: var(--muted); }
 .acicon .ac { position: relative; width: 20px; height: 20px; }
 .acicon svg { width: 20px; height: 20px; fill: #f2d21b; stroke: #000; stroke-width: 1; }
 .acicon span { position: absolute; left: 18px; top: -4px; white-space: nowrap; font: 11px/1.2 var(--mono); color: #f2d21b; text-shadow: 0 0 3px #000, 0 0 3px #000; }
+
+/* Karta z odnośnikiem do serwisu, który nie daje się osadzić w ramce */
+.ext-card { max-width: 760px; }
+.ext-card p { margin: 8px 0; line-height: 1.45; }
+.btn.big { display: inline-block; font-size: 17px; padding: 10px 18px; margin: 8px 0; text-decoration: none; }
+
+/* MAP: plakietki stanowisk online (jak w VATSIM Radar): D / G / T / A / APP przy lotnisku, CTR przy FIR */
+.ab { display: inline-block; min-width: 15px; padding: 0 3px; font: 700 11px/15px var(--mono); text-align: center; color: #fff; border-radius: 2px; }
+.ab-del { background: #2f6fe0; } .ab-gnd { background: #1f9a55; } .ab-twr { background: #d93a3a; }
+.ab-atis { background: #f0b429; color: #111; } .ab-app { background: #0f8fb0; } .ab-ctr { background: #5fd23a; color: #062b00; }
+.atcicon { background: none; border: 0; }
+.atcicon > .atcb { position: absolute; transform: translate(-50%, 9px); }
+.atcicon.center > .atcb { transform: translate(-50%, -50%); }
+.atcb { display: flex; align-items: center; gap: 2px; padding: 2px; background: #0b0d10; border: 1px solid #3a4652; border-radius: 3px;
+  box-shadow: 0 1px 4px rgba(0,0,0,.6); white-space: nowrap; cursor: pointer; }
+.atcb .ab-icao { color: #fff; font: 700 11px/15px var(--mono); padding: 0 3px; }
+.atcb.fir { border-color: #5fd23a; }
+.atcicon:hover .atcb { border-color: #fff; }
+.leaflet-tooltip.atc-tip { background: #0b0d10; color: #e6ebef; border: 1px solid #3a4652; border-radius: 4px; padding: 6px 8px;
+  box-shadow: 0 4px 14px rgba(0,0,0,.7); font: 12px var(--mono); max-width: 560px; white-space: normal; }
+.leaflet-tooltip.atc-tip::before { border-top-color: #3a4652; }
+.atc-tip-h { margin-bottom: 4px; color: #9fb0bf; font-family: Arial, sans-serif; }
+.atc-tip-h b { color: #fff; font-family: var(--mono); font-size: 13px; }
+.atc-tip table { border-collapse: collapse; }
+.atc-tip td { padding: 2px 5px; vertical-align: top; white-space: nowrap; }
+.atc-tip td.cs { color: #fff; font-weight: 700; }
+.atc-tip td.fq { color: #9dff6e; }
+.atc-tip td.atis { white-space: normal; color: #f3df9a; padding-bottom: 5px; max-width: 460px; }
+.atc-tip .muted { color: #8fa3b5; }
+.lg-atc { display: flex; flex-wrap: wrap; gap: 4px 10px; }
+.lg-atc > span { display: inline-flex; align-items: center; gap: 5px; }
+.sw .ab { font-size: 10px; }

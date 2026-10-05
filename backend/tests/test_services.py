@@ -11,7 +11,8 @@ from types import SimpleNamespace
 from backend.app.importers.callsigns import parse_gr_operator_info
 from backend.app.services.lvp import evaluate as evaluate_lvp
 from backend.app.services.notam import for_aerodrome, split_notams
-from backend.app.services.vatsim import airport_traffic, bookings_by_callsign, match_positions, online_firs, parse_atis
+from backend.app.services.vatsim import (airport_atc, airport_traffic, bookings_by_callsign, match_positions, online_firs,
+                                        parse_atis)
 from backend.app.services.runways import runway_equipment, select_runways, suggest_runway, wind_components
 
 
@@ -167,6 +168,15 @@ def test_vatsim_matching_and_bookings():
     # tylko bieżąca doba UTC: rezerwacja na jutro rano nie wchodzi
     tomorrow = [{"cid": 8, "callsign": "EPKK_APP", "start": fmt(now + timedelta(hours=8)), "end": fmt(now + timedelta(hours=9))}]
     assert bookings_by_callsign(tomorrow, "EP", now=now) == {}
+
+
+def test_airport_atc_groups():
+    ctrls = [{"callsign": "EPWA_N_APP"}, {"callsign": "EPWA_DEP"}, {"callsign": "EPWA_TWR"}, {"callsign": "EPKK_ATIS"},
+             {"callsign": "EPWW_C_CTR"}, {"callsign": "EPWA_OBS"}, {"callsign": "EPGD_RMP"}, {"callsign": "SOMEONE"}]
+    out = airport_atc(ctrls)
+    assert sorted(out) == ["EPGD", "EPKK", "EPWA"]
+    assert [c["callsign"] for c in out["EPWA"]["APP"]] == ["EPWA_N_APP", "EPWA_DEP"] and "TWR" in out["EPWA"]
+    assert list(out["EPGD"]) == ["GND"] and list(out["EPKK"]) == ["ATIS"]
 
 
 def test_airport_traffic():

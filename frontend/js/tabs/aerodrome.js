@@ -95,20 +95,22 @@ function runwayBox(st) {
   return `<div class="rwy-use ${fromAtis ? "atis" : "pref"}"><div class="label">${title}</div><div class="pair">${body}</div><div class="hint">${note}</div></div>`;
 }
 
-const EQUIP_SHOW = ["ILS", "LOC", "RNP", "VOR", "NDB"];
+const EQUIP_SHOW = ["ILS", "LOC", "RNP"];
 function runwayTable(st) {
   const u = st.runway_in_use || {};
   const role = (d) => [d === u.arr ? "ARR" : "", d === u.dep ? "DEP" : ""].filter(Boolean).join("/");
-  return `<table class="data rwy-table"><thead><tr><th>Pas</th><th></th><th>Kurs</th><th>Dług. × szer.</th><th>Podejścia</th><th>Czołowy</th><th>Boczny</th></tr></thead><tbody>
+  return `<table class="data rwy-table"><thead><tr><th>Pas</th><th></th><th>Kurs</th><th>Dł. m</th><th>Podejście</th><th>Czoł.</th><th>Bocz.</th></tr></thead><tbody>
     ${st.runways.map((r) => {
       const ro = role(r.designator);
-      return `<tr class="${ro ? "inuse" : ""}"><td class="rwy">${esc(r.designator)}</td><td>${ro ? `<span class="tag use">${ro}</span>` : ""}</td>
-      <td class="num">${fmt(r.heading, 0)}°</td><td class="num">${fmt(r.length_m, 0)}${r.width_m ? " × " + fmt(r.width_m, 0) : ""}</td>
-      <td>${(r.equipment || []).filter((k) => EQUIP_SHOW.includes(k)).map((k) => `<span class="eq ${k === "ILS" ? "ils" : ""}">${k}</span>`).join("")}</td>
+      const eq = r.equipment || [];
+      const tip = `${r.designator}: ${fmt(r.length_m, 0)} × ${fmt(r.width_m, 0)} m, ${r.surface || "?"}; podejścia: ${eq.join(", ") || "brak danych"}`;
+      return `<tr class="${ro ? "inuse" : ""}" title="${esc(tip)}"><td class="rwy">${esc(r.designator)}</td><td>${ro ? `<span class="tag use">${ro}</span>` : ""}</td>
+      <td class="num">${fmt(r.heading, 0)}°</td><td class="num">${fmt(r.length_m, 0)}</td>
+      <td>${eq.filter((k) => EQUIP_SHOW.includes(k)).map((k) => `<span class="eq ${k === "ILS" ? "ils" : ""}">${k}</span>`).join("")}</td>
       <td class="num" style="color:${r.headwind < 0 ? "var(--bad)" : "inherit"}">${r.headwind === null ? "–" : (r.headwind < 0 ? "TW " : "") + Math.abs(r.headwind).toFixed(0)}</td>
       <td class="num">${r.crosswind === null ? "–" : Math.abs(r.crosswind).toFixed(0) + (r.crosswind > 0 ? " R" : r.crosswind < 0 ? " L" : "")}</td></tr>`;
     }).join("")}
-  </tbody></table><div class="hint">wiatr w kt · podejścia z procedur w pakiecie sektorowym</div>`;
+  </tbody></table><div class="hint">wiatr w kt · najedź na pas: szerokość, nawierzchnia, wszystkie podejścia</div>`;
 }
 
 // NOTAM: okres ważności względem teraz
@@ -159,7 +161,7 @@ function windText(p) {
 }
 
 function value(label, v, extra = "") {
-  return `<div class="card"><div class="label">${label}</div><div class="big" style="font-size:22px">${v}</div>${extra}</div>`;
+  return `<div class="card"><div class="label">${label}</div><div class="val">${v}</div>${extra}</div>`;
 }
 
 export default {
@@ -168,7 +170,7 @@ export default {
     const sub = h(`<nav class="submenu">${MAIN.map((i) => `<button data-ad="${i}">${i}</button>`).join("")}</nav>`);
     root.append(sub);
     sub.addEventListener("click", (e) => { const b = e.target.closest("button[data-ad]"); if (b) go(b.dataset.ad); });
-    const pane = h(`<div class="pane">
+    const pane = h(`<div class="pane ad-pane">
       <div class="toolbar">
         <input class="field ad" list="ad-list" size="10" placeholder="ICAO">
         <datalist id="ad-list"></datalist>
@@ -203,7 +205,7 @@ export default {
 
     let notamSort = localStorage.getItem("notam.sort") || "id";
     const renderNotams = async (el) => {
-      el.innerHTML = `<span class="hint">Ładowanie NOTAM…</span>`;
+      if (!el.innerHTML) el.innerHTML = `<span class="hint">Ładowanie NOTAM…</span>`;
       let data;
       try { data = await api(`/api/notam/${icao}`); } catch (e) { el.innerHTML = `<span class="error">${esc(e.message)}</span>`; return; }
       const draw = () => {
@@ -252,12 +254,41 @@ export default {
         `Zielone = online, przerywana ramka = rezerwacja (najedź, żeby zobaczyć kto). ${errs.length ? `<span class="error">${errs.join(" · ")}</span>` : ""}`);
     };
 
+    // Układ na jeden ekran: cztery kolumny, długie listy przewijają się wewnątrz swoich okienek.
+    // Szkielet budujemy raz na lotnisko (checklista i NOTAM-y zostają), dane odświeżamy co minutę.
+    const build = () => {
+      $(".content").innerHTML = `
+        <div class="ad-errors"></div>
+        <div class="metar-head"></div>
+        <div class="ad-grid">
+          <div class="ad-col">
+            <div class="card ad-wind"></div>
+            <div class="card grow"><h3 class="atis-h">ATIS</h3><div class="scroll ad-atis"></div></div>
+          </div>
+          <div class="ad-col">
+            <div class="values compact"></div>
+            <div class="card"><h3>Pasy</h3><div class="ad-rwys"></div></div>
+            <div class="card"><h3>TAF</h3><div class="ad-taf wx"></div></div>
+            <div class="card grow"><h3>Ruch VATSIM</h3><div class="scroll ad-traffic"><span class="hint">Ładowanie…</span></div></div>
+          </div>
+          <div class="ad-col">
+            <div class="card part"><h3>Częstotliwości · online · rezerwacje</h3><div class="scroll freqs"></div></div>
+            <div class="card grow"><h3>NOTAM</h3><div class="scroll notams"></div></div>
+          </div>
+          <div class="ad-col">
+            <div class="card grow"><h3>Checklista</h3><div class="scroll checklist"></div></div>
+          </div>
+        </div>`;
+      renderNotams($(".notams"));
+      renderOpenChecklist($(".checklist"));
+    };
+
+    let ticks = 0;
     const load = async () => {
-      const content = $(".content");
       let info, st;
       try {
         [info, st] = await Promise.all([api(`/api/aerodromes/${icao}`), api(`/api/aerodromes/${icao}/status`)]);
-      } catch (e) { content.innerHTML = `<p class="error">${esc(e.message)}</p>`; return; }
+      } catch (e) { $(".ad-errors").innerHTML = `<p class="error">${esc(e.message)}</p>`; return; }
       const p = st.parsed || {};
       $(".title").textContent = `${info.icao} · ${info.name}  (elev ${fmt(info.elevation_ft, 0)} ft)`;
       $(".upd").textContent = "Aktualizacja " + new Date().toISOString().slice(11, 16) + "Z";
@@ -265,48 +296,33 @@ export default {
       const rvr = (p.rvr || []).map((x) => `R${x.runway} ${x.value}`).join("<br>") || "–";
       const age = obsAge(p.time);
       const gust = p.wind_gust ? ` <span class="gust">G${p.wind_gust}</span>` : "";
-      content.innerHTML = `
-        ${st.errors.length ? `<p class="error">${st.errors.map(esc).join("<br>")}</p>` : ""}
-        <div class="metar-head">
+      $(".ad-errors").innerHTML = st.errors.length ? `<p class="error">${st.errors.map(esc).join("<br>")}</p>` : "";
+      $(".metar-head").innerHTML = `
           <div class="wx">${colorize(st.metar)}</div>
           <div class="obs ${age !== null && age > 70 ? "stale" : ""}">${p.time ? `obs. ${esc(p.time.slice(2, 4))}:${esc(p.time.slice(4, 6))}Z` : ""}${age !== null ? ` · ${age} min temu` : ""}</div>
-          ${lvpBox(st.lvp)}
-        </div>
-        <div class="awos">
-          <div class="card" style="text-align:center">${windrose(st)}
+          ${lvpBox(st.lvp)}`;
+      $(".ad-wind").innerHTML = `${windrose(st)}
             <div class="big">${windText(p).replace(/G\d+/, "")}${gust}</div>
             <div class="hint">${p.wind_speed !== null && p.wind_speed !== undefined ? `${Math.round(p.wind_speed * 0.514)} m/s` : ""}${p.wind_var_from !== null && p.wind_var_from !== undefined ? ` · zmienny ${p.wind_var_from}°–${p.wind_var_to}°` : ""}</div>
-            ${runwayBox(st)}
-          </div>
-          <div>
-            <div class="values">
+            ${runwayBox(st)}`;
+      $(".values").innerHTML = `
               ${value("QNH", p.qnh ?? "–", '<span class="hint">hPa</span>')}
               ${value("QFE", st.qfe ?? "–", '<span class="hint">hPa (przybl.)</span>')}
               ${value("Widzialność", p.visibility_m !== null && p.visibility_m !== undefined ? (p.visibility_m >= 9999 ? "≥10 km" : p.visibility_m + " m") : "–")}
-              ${value("RVR", `<span style="font-size:15px">${rvr}</span>`)}
+              ${value("RVR", `<span class="sm">${rvr}</span>`)}
               ${value("Podstawa", p.ceiling_ft ? p.ceiling_ft + " ft" : "–")}
-              ${value("Chmury", `<span style="font-size:15px">${esc(clouds)}</span>`)}
-              ${value("Temp / Dew", `${p.temperature ?? "–"} / ${p.dewpoint ?? "–"}`, `<span class="hint">°C${p.temperature !== null && p.dewpoint !== null && p.temperature !== undefined && p.temperature - p.dewpoint <= 2 ? ' · <span style="color:var(--warn)">mały spread, ryzyko mgły</span>' : ""}</span>`)}
-              ${value("Zjawiska", `<span style="font-size:15px">${esc((p.weather || []).join(" ") || "–")}</span>`)}
-              ${value("Kategoria", `<span class="cat-${esc(p.flight_category)}">${esc(p.flight_category || "–")}</span>`, p.trend ? `<div class="hint mono">${esc(p.trend)}</div>` : "")}
-            </div>
-            <div class="card" style="margin-top:12px"><h3>Pasy</h3>${runwayTable(st)}</div>
-          </div>
-          <div class="card"><h3>Checklista</h3><div class="checklist"></div></div>
-        </div>
-        <div class="grid two" style="margin-top:12px">
-          <div class="card"><h3>Częstotliwości · online · rezerwacje</h3><div class="freqs"></div></div>
-          <div class="card"><h3>Ruch VATSIM</h3><div class="ad-traffic"><span class="hint">Ładowanie…</span></div></div>
-          <div class="card"><h3>TAF</h3><div class="wx">${st.taf ? wxLines("taf", st.taf) : colorize(null)}</div></div>
-          <div class="card"><h3>ATIS ${st.atis ? esc(st.atis.letter || "") : ""}</h3>${st.atis
-            ? `<div class="mono atis-text">${st.atis.lines.map(esc).join("<br>")}</div>`
-            : `<span class="hint">${st.network_error ? esc(st.network_error) : "ATIS nie jest teraz nadawany w sieci VATSIM."}</span>`}</div>
-          <div class="card" style="grid-column:1/-1"><h3>NOTAM</h3><div class="notams"></div></div>
-        </div>`;
-      renderFreqs(content.querySelector(".freqs"), info);
-      renderNotams(content.querySelector(".notams"));
-      renderOpenChecklist(content.querySelector(".checklist"));
-      renderTraffic(content.querySelector(".ad-traffic"));
+              ${value("Chmury", `<span class="sm">${esc(clouds)}</span>`)}
+              ${value("Temp / Dew", `${p.temperature ?? "–"} / ${p.dewpoint ?? "–"}`, p.temperature !== null && p.dewpoint !== null && p.temperature !== undefined && p.temperature - p.dewpoint <= 2 ? '<span class="hint" style="color:var(--warn)">mały spread</span>' : "")}
+              ${value("Zjawiska", `<span class="sm">${esc((p.weather || []).join(" ") || "–")}</span>`)}
+              ${value("Kategoria", `<span class="cat-${esc(p.flight_category)}">${esc(p.flight_category || "–")}</span>`, p.trend ? `<span class="hint mono">${esc(p.trend)}</span>` : "")}`;
+      $(".ad-rwys").innerHTML = runwayTable(st);
+      $(".ad-taf").innerHTML = st.taf ? wxLines("taf", st.taf) : colorize(null);
+      $(".atis-h").textContent = `ATIS ${st.atis ? st.atis.letter || "" : ""}`;
+      $(".ad-atis").innerHTML = st.atis ? `<div class="mono atis-text">${st.atis.lines.map(esc).join("<br>")}</div>`
+        : `<span class="hint">${st.network_error ? esc(st.network_error) : "ATIS nie jest teraz nadawany w sieci VATSIM."}</span>`;
+      renderFreqs($(".freqs"), info);
+      renderTraffic($(".ad-traffic"));
+      if (++ticks % 10 === 0) renderNotams($(".notams"));
     };
 
     const go = (code) => {
@@ -315,6 +331,8 @@ export default {
       localStorage.setItem("aerodrome.icao", icao);
       sub.querySelectorAll("button").forEach((b) => b.classList.toggle("active", b.dataset.ad === icao));
       history.replaceState(null, "", "#aerodrome/" + icao);
+      ticks = 0;
+      build();
       load();
       clearInterval(timer);
       timer = setInterval(load, 60000);

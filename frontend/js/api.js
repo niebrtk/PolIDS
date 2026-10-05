@@ -98,6 +98,7 @@ function cached(key, ttl, fn) {
   return p;
 }
 export const vatsimOnline = () => cached("online", 30000, () => api("/api/vatsim/online"));
+export const vatsimAtc = () => cached("atc", 30000, () => api("/api/vatsim/atc"));
 export const vatsimBookings = () => cached("bookings", 300000, () => api("/api/vatsim/bookings?prefix=EP"));
 export const atcPositions = () => cached("positions", 3600000, () => api("/api/nav/positions"));
 export const aerodromeNames = () => cached("adnames", 3600000, () => api("/api/aerodromes")

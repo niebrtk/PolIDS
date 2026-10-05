@@ -103,3 +103,22 @@ def test_vatsim_endpoints(client):
     assert any(f["properties"]["id"] == "EPWW" for f in client.get("/api/vatsim/firs").json()["features"])
     ad = client.get("/api/vatsim/airport/EPWA").json()
     assert [p["callsign"] for p in ad["departures"]] == ["LOT1"] and ad["arrivals"] == []
+
+
+def test_vatsim_atc_badges(client):
+    from backend.app.routers import vatsim
+
+    async def feed():
+        return {"general": {}, "pilots": [],
+                "controllers": [{"callsign": "EPWA_APP", "frequency": "128.805", "name": "Jan", "cid": 1},
+                                {"callsign": "EPWA_GND", "frequency": "121.905", "name": "Ola", "cid": 2},
+                                {"callsign": "XXX_TWR", "frequency": "118.000", "name": "?", "cid": 3},
+                                {"callsign": "EDWW_FLG_CTR", "frequency": "136.450", "name": "Max", "cid": 4}],
+                "atis": [{"callsign": "EPWA_ATIS", "frequency": "120.455", "atis_code": "K", "text_atis": ["INFO K"]}]}
+    vatsim.get_feed = feed
+    r = client.get("/api/vatsim/atc").json()
+    assert [a["icao"] for a in r["airports"]] == ["EPWA"]  # XXX nie ma w bazie lotnisk
+    ep = r["airports"][0]
+    assert sorted(ep["facilities"]) == ["APP", "ATIS", "GND"] and ep["lat"] > 52
+    assert ep["facilities"]["ATIS"][0]["atis_code"] == "K"
+    assert r["firs"]["EDWW-FLG"][0]["name"] == "Max"

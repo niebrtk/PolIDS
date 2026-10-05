@@ -1,5 +1,5 @@
-import { BASEMAPS, LIGHT_BASEMAPS, api, atcPositions, esc, h, hhmm, vatsimOnline } from "../api.js";
-import { SymbolMarker, aircraftMarker, drawFirs, drawSectors, fl, loadFirs, sectorOwners, symbolFor, symbolSvg } from "../airspace.js";
+import { BASEMAPS, LIGHT_BASEMAPS, api, atcPositions, esc, h, hhmm, vatsimAtc, vatsimOnline } from "../api.js";
+import { FACILITIES, SymbolMarker, aircraftMarker, airportBadge, atcPanes, drawFirs, drawSectors, fl, loadFirs, sectorOwners, symbolFor, symbolSvg } from "../airspace.js";
 
 // Kolory zależne od podkładu (ciemny / jasny)
 const THEME = {
@@ -20,6 +20,8 @@ export default {
           <h4>Ruch VATSIM</h4>
           ${sw("traffic", "samoloty", true, `<svg class="sym" width="18" height="18" viewBox="-10 -10 20 20"><path d="M0,-9 L6,8 L0,4 L-6,8 Z" class="acsym"/></svg>`)}
           ${sw("traffic-detail", "etykiety z FL, typem i GS")}
+          ${sw("atc", "kontrolerzy online: plakietki D / G / T / A / APP", true, `<span class="ab ab-twr">T</span>`)}
+          <div class="atc-info hint"></div>
           <div class="traffic-info hint"></div>
           <div class="flight" style="display:none"></div>
         </section>
@@ -61,6 +63,9 @@ export default {
           <div class="lg"><span class="swatch on"></span>sektor / FIR obsadzony (online)</div>
           <div class="lg"><span class="swatch unicom"></span>sektor bez kontrolera (UNICOM 122.800)</div>
           <div class="lg"><span class="lg-freq">133.475</span>częstotliwość obsadzonego sektora</div>
+          <div class="lg lg-atc">${FACILITIES.map(([k, l, n]) => `<span><span class="ab ab-${k.toLowerCase()}">${l}</span>${n}</span>`).join("")}
+            <span><span class="ab ab-ctr">CTR</span>Control (FIR)</span></div>
+          <p class="hint">Najedź na plakietkę, żeby zobaczyć, kto jest online.</p>
           <p class="hint">Oficjalna mapa sektorów: <a href="${esc(ctx.config.links.sectors)}" target="_blank" rel="noopener">plvacc.pl/acc-sectors ↗</a></p>
         </section>
       </div>
@@ -77,10 +82,11 @@ export default {
     let theme = THEME.dark;
     const layers = {
       firs: L.layerGroup().addTo(map), sectors: L.layerGroup().addTo(map), airways: L.layerGroup(),
-      ads: L.layerGroup().addTo(map), points: L.layerGroup().addTo(map), route: L.layerGroup().addTo(map),
+      ads: L.layerGroup().addTo(map), points: L.layerGroup().addTo(map), route: L.layerGroup().addTo(map), atc: L.layerGroup().addTo(map),
       traffic: L.layerGroup().addTo(map), flight: L.layerGroup().addTo(map),
     };
     let openaip = null;
+    const panes = atcPanes(map);
 
     const paintLegend = () => pane.querySelectorAll("i[data-sym]").forEach((i) => {
       i.outerHTML = `<i data-sym="${i.dataset.sym}">${symbolSvg(i.dataset.sym, THEME.dark[KIND_COLOR[i.dataset.sym]])}</i>`;
@@ -127,22 +133,23 @@ export default {
       return m;
     };
 
-    // --- lotniska
+    // --- lotniska (lotnisko z plakietką ATC nie dostaje osobnej nazwy: ICAO jest na plakietce)
     let ads = [];
+    let atcAds = new Set();
     const drawAds = () => {
       layers.ads.clearLayers();
       const z = map.getZoom();
       ads.forEach((a) => {
         const big = a.kind === "large_airport" || a.kind === "medium_airport";
-        if (!big && z < 8) return;
+        if (!big && z < 8 && !atcAds.has(a.icao)) return;
         pointMarker({ ident: a.icao, kind: "AD", lat: a.lat, lon: a.lon, name: a.name },
-          { label: z >= 7 || (big && z >= 6), permanent: true, scale: big ? 1.8 : 1.4, popup: false })
+          { label: !atcAds.has(a.icao) && (z >= 7 || (big && z >= 6)), permanent: true, scale: big ? 1.8 : 1.4, popup: false })
           .on("click", () => ctx.open("aerodrome", a.icao)).addTo(layers.ads);
       });
     };
     api("/api/aerodromes").then((list) => {
       ads = list.filter((a) => a.kind !== "small_airport" || a.icao.startsWith("EP"));
-      drawAds();
+      loadAtc();
     });
     $(".ads").addEventListener("change", (e) => (e.target.checked ? layers.ads.addTo(map) : map.removeLayer(layers.ads)));
 
@@ -158,7 +165,7 @@ export default {
       ]);
       layers.sectors.clearLayers();
       layers.firs.clearLayers();
-      if (firs) drawFirs(layers.firs, firs, net?.firs || {});
+      if (firs) drawFirs(layers.firs, firs, net?.firs || {}, { panes });
       if (!gj) { $(".sector-info").textContent = ""; return; }
       const online = wantOnline && net && !net.error ? sectorOwners(gj, positions, net.positions) : null;
       drawSectors(layers.sectors, gj, online);
@@ -169,6 +176,27 @@ export default {
     ["sectors", "online", "firs"].forEach((c) => $("." + c).addEventListener("change", loadSectors));
     $(".fl").addEventListener("change", loadSectors);
     setInterval(() => document.body.contains(pane) && loadSectors(), 60000);
+
+    // --- kontrolerzy online: plakietki lotnisk (D/G/T/A/APP) jak w VATSIM Radar; CTR rysuje drawFirs
+    const loadAtc = async () => {
+      layers.atc.clearLayers();
+      if (!$(".atc").checked) { atcAds = new Set(); $(".atc-info").textContent = ""; drawAds(); return; }
+      try {
+        const data = await vatsimAtc();
+        const known = new Set(ads.map((a) => a.icao));
+        atcAds = new Set(data.airports.map((a) => a.icao));
+        data.airports.forEach((ap) => {
+          // lotniska spoza listy (zagraniczne) dostają sam symbol pod plakietką
+          if (!known.has(ap.icao)) pointMarker({ ident: ap.icao, kind: "AD", lat: ap.lat, lon: ap.lon, name: ap.name }, { label: false, scale: 1.6 }).addTo(layers.atc);
+          const m = airportBadge(ap, panes).addTo(layers.atc);
+          if (ap.icao.startsWith("EP")) m.on("click", () => ctx.open("aerodrome", ap.icao));
+        });
+        $(".atc-info").textContent = `${data.airports.length} lotnisk z kontrolerem · ${hhmm(new Date().toISOString())}`;
+      } catch (e) { atcAds = new Set(); $(".atc-info").innerHTML = `<span class="error">${esc(e.message)}</span>`; }
+      drawAds();
+    };
+    $(".atc").addEventListener("change", loadAtc);
+    setInterval(() => document.body.contains(pane) && $(".atc").checked && loadAtc(), 30000);
 
     // --- trasa: gruba linia z obwódką (czytelna na każdym podkładzie), punkty jako symbole z nazwą w ramce
     const drawRoute = (layer, pts, color) => {

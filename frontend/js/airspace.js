@@ -14,28 +14,76 @@ export const loadFirs = () => (firsPromise ||= api("/api/vatsim/firs").catch((e)
 
 export const fl = (ft) => "FL" + String(Math.round((ft || 0) / 100)).padStart(3, "0");
 
-// Granice FIR: szare kontury, FIR z zalogowanym kontrolerem CTR/FSS na zielono z jego callsignem i częstotliwością.
-export function drawFirs(layer, firs, onlineFirs = {}, { skip = ["EPWW"], labels = true } = {}) {
+// --- Plakietki stanowisk online jak w VATSIM Radar: lotnisko = ICAO + D/G/T/A/APP, FIR = CTR + id.
+// Po najechaniu dymek z listą: znak, częstotliwość, imię i nazwisko, CID, rating, od kiedy online, ATIS.
+export const FACILITIES = [["DEL", "D", "Delivery"], ["GND", "G", "Ground"], ["TWR", "T", "Tower"], ["ATIS", "A", "ATIS"],
+  ["APP", "APP", "Approach / Departure"]];
+const RATINGS = { 1: "OBS", 2: "S1", 3: "S2", 4: "S3", 5: "C1", 6: "C2", 7: "C3", 8: "I1", 9: "I2", 10: "I3", 11: "SUP", 12: "ADM" };
+const since = (iso) => {
+  if (!iso) return "";
+  const min = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 60000));
+  return `od ${new Date(iso).toISOString().slice(11, 16)}Z (${min < 60 ? min + " min" : Math.floor(min / 60) + " h " + (min % 60) + " min"})`;
+};
+const tag = (kind, letter) => `<span class="ab ab-${kind.toLowerCase()}">${letter}</span>`;
+
+function atcRows(list, kind, letter) {
+  return list.map((c) => `<tr><td>${tag(kind, letter)}</td><td class="cs">${esc(c.callsign)}</td><td class="fq">${esc(c.frequency)}</td>
+    <td>${esc(c.name || "?")} <span class="muted">${esc(c.cid ?? "")}${RATINGS[c.rating] ? " · " + RATINGS[c.rating] : ""}</span></td>
+    <td class="muted">${since(c.logon_time)}</td></tr>${kind === "ATIS" && c.text_atis?.length
+      ? `<tr><td></td><td colspan="4" class="atis">${c.atis_code ? `<b>INFO ${esc(c.atis_code)}</b> ` : ""}${c.text_atis.map(esc).join(" ")}</td></tr>` : ""}`).join("");
+}
+
+// Osobne warstwy (panes) nad nazwami punktów, żeby plakietek nie przykrywały etykiety; dymki jeszcze wyżej.
+export function atcPanes(map) {
+  [["atcFir", 655], ["atcAd", 660], ["atcTip", 700]].forEach(([n, z]) => {
+    if (!map.getPane(n)) map.createPane(n).style.zIndex = z;
+  });
+  return { fir: "atcFir", ad: "atcAd", tip: "atcTip" };
+}
+
+export function atcTooltip(title, subtitle, rows) {
+  return `<div class="atc-tip-h"><b>${esc(title)}</b> ${esc(subtitle || "")}</div><table>${rows}</table>`;
+}
+
+// Plakietka lotniska (divIcon pod punktem lotniska) z dymkiem
+export function airportBadge(ap, panes = {}) {
+  const fac = ap.facilities;
+  const html = `<div class="atcb"><b class="ab-icao">${esc(ap.icao)}</b>${FACILITIES.filter(([k]) => fac[k])
+    .map(([k, l]) => tag(k, l)).join("")}</div>`;
+  const rows = FACILITIES.filter(([k]) => fac[k]).map(([k, l]) => atcRows(fac[k], k, l)).join("");
+  return L.marker([ap.lat, ap.lon], { icon: L.divIcon({ className: "atcicon", html, iconSize: null }), pane: panes.ad || "markerPane" })
+    .bindTooltip(atcTooltip(ap.icao, ap.name, rows), { direction: "top", offset: [0, -6], className: "atc-tip", opacity: 1, pane: panes.tip || "tooltipPane" });
+}
+
+// Granice FIR: szare kontury; FIR z zalogowanym kontrolerem CTR/FSS na zielono z plakietką CTR (dymek: kto jest online).
+// FIR-y z `skip` (EPWW: rysujemy tam sektory z pliku .ese) dostają samą plakietkę, gdy ktoś jest online.
+export function drawFirs(layer, firs, onlineFirs = {}, { skip = ["EPWW"], labels = true, panes = {} } = {}) {
   firs.features.forEach((f) => {
     const id = f.properties.id;
-    if (skip.some((s) => id === s || id.startsWith(s + "-"))) return;
     const on = onlineFirs[id];
+    const skipped = skip.some((s) => id === s || id.startsWith(s + "-"));
+    if (skipped && !on) return;
     // sektory ACC (EDWW-ALR itd.) rysujemy tylko, gdy są online; całe FIR-y zawsze
     if (id.includes("-") && !on) return;
-    L.geoJSON(f, {
-      interactive: false,
-      style: on ? { color: "#5fd23a", weight: 1.5, fillColor: "#5fd23a", fillOpacity: 0.12 }
-        : { color: "#4a524a", weight: 1, fill: false, dashArray: "4 4" },
-    }).addTo(layer);
-    if (labels) {
-      const html = on ? on.map((c) => `<span class="freq on">${esc(c.frequency)}</span> ${esc(c.callsign)}`).join("<br>")
-        : `<span class="firname">${esc(id)}</span>`;
-      L.marker([f.properties.label[1], f.properties.label[0]], {
-        interactive: !!on,
-        icon: L.divIcon({ className: "maplabel", html: `<div>${html}</div>`, iconSize: null }),
-      }).bindTooltip(on ? on.map((c) => `${esc(c.callsign)} · ${esc(c.name || "")} (${esc(c.cid)})`).join("<br>") : "")
-        .addTo(layer);
+    if (!skipped) {
+      L.geoJSON(f, {
+        interactive: false,
+        style: on ? { color: "#5fd23a", weight: 1.5, fillColor: "#5fd23a", fillOpacity: 0.12 }
+          : { color: "#4a524a", weight: 1, fill: false, dashArray: "4 4" },
+      }).addTo(layer);
     }
+    if (!labels) return;
+    const at = [f.properties.label[1], f.properties.label[0]];
+    if (!on) {
+      L.marker(at, { interactive: false, icon: L.divIcon({ className: "maplabel", html: `<div><span class="firname">${esc(id)}</span></div>`, iconSize: null }) })
+        .addTo(layer);
+      return;
+    }
+    const html = `<div class="atcb fir">${tag("CTR", "CTR")}<b class="ab-icao">${esc(id)}</b></div>`;
+    L.marker(at, { icon: L.divIcon({ className: "atcicon center", html, iconSize: null }), pane: panes.fir || "markerPane" })
+      .bindTooltip(atcTooltip(id, f.properties.name || "", atcRows(on, "CTR", "CTR")),
+        { direction: "top", offset: [0, -12], className: "atc-tip", opacity: 1, pane: panes.tip || "tooltipPane" })
+      .addTo(layer);
   });
 }
 

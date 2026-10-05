@@ -126,6 +126,23 @@ def online_firs(controllers: list[dict]) -> dict[str, list[dict]]:
     return out
 
 
+# Końcówka znaku -> rodzaj stanowiska na plakietce lotniska (jak w VATSIM Radar: D, G, T, A oraz APP)
+FACILITY_TYPES = {"DEL": "DEL", "GND": "GND", "RMP": "GND", "TWR": "TWR", "APP": "APP", "DEP": "APP", "ATIS": "ATIS"}
+
+
+def airport_atc(controllers: list[dict]) -> dict[str, dict[str, list[dict]]]:
+    """Stanowiska lotniskowe i zbliżania pogrupowane wg prefiksu znaku i rodzaju.
+
+    Np. EPWA_N_APP i EPWA_TWR -> {"EPWA": {"APP": [...], "TWR": [...]}}. CTR/FSS i obserwatorów pomijamy."""
+    out: dict[str, dict[str, list[dict]]] = {}
+    for c in controllers:
+        parts = c.get("callsign", "").upper().split("_")
+        kind = FACILITY_TYPES.get(parts[-1]) if len(parts) > 1 else None
+        if kind:
+            out.setdefault(parts[0], {}).setdefault(kind, []).append(controller_info(c))
+    return out
+
+
 def pilot_info(p: dict) -> dict:
     fp = p.get("flight_plan") or {}
     return {"callsign": p.get("callsign"), "cid": p.get("cid"), "name": p.get("name"),

@@ -1,5 +1,5 @@
 import { aerodromeNames, api, atcPositions, esc, hhmm, positionTip, subtabs, vatsimBookings, vatsimOnline } from "../api.js";
-import { drawFirs, drawSectors, loadFirs, sectorOwners } from "../airspace.js";
+import { atcPanes, drawFirs, drawSectors, loadFirs, sectorOwners } from "../airspace.js";
 
 const TYPE_ORDER = ["CTR", "FSS", "APP", "DEP", "TWR", "GND", "DEL", "ATIS"];
 // Lotniska komunikacyjne z AIP IFR, wojskowe; pozostałe EP** traktujemy jak VFR
@@ -121,7 +121,7 @@ function accView(pane) {
     firLayer.clearLayers();
     secLayer.clearLayers();
     if (firs) {
-      drawFirs(firLayer, firs, st.onlineRaw?.firs || {});
+      drawFirs(firLayer, firs, st.onlineRaw?.firs || {}, { panes: atcPanes(map) });
       const epww = firs.features.find((f) => f.properties.id === "EPWW");
       if (epww) {
         const outline = L.geoJSON(epww, { interactive: false, style: { color: "#9cdc84", weight: 2, fill: false } }).addTo(firLayer);

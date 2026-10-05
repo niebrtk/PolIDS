@@ -5,11 +5,11 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..models import Aerodrome, AtcPosition
+from ..models import Aerodrome, AtcPosition, NavPoint
 from ..services.http_cache import UpstreamError
 from ..services.route import RouteResolver
-from ..services.vatsim import (airport_traffic, bookings_by_callsign, controller_info, fir_boundaries, get_bookings,
-                               get_feed, match_positions, online_firs, pilot_info)
+from ..services.vatsim import (airport_atc, airport_traffic, bookings_by_callsign, controller_info, fir_boundaries,
+                               get_bookings, get_feed, match_positions, online_firs, pilot_info)
 
 router = APIRouter(prefix="/api/vatsim", tags=["vatsim"])
 
@@ -29,6 +29,23 @@ async def online(db: Session = Depends(get_db)):
     positions = db.scalars(select(AtcPosition)).all()
     return {"positions": match_positions(ctrls, positions), "firs": online_firs(ctrls),
             "controllers": [controller_info(c) for c in ctrls if c.get("callsign", "").startswith("EP")],
+            "updated": data.get("general", {}).get("update_timestamp")}
+
+
+@router.get("/atc")
+async def atc(db: Session = Depends(get_db)):
+    """Kontrolerzy online do plakietek na mapie: lotniska (DEL/GND/TWR/APP/ATIS) z pozycją i FIR-y (CTR/FSS)."""
+    data = await _feed()
+    ctrls = data.get("controllers", []) + data.get("atis", [])
+    groups = airport_atc(ctrls)
+    ads = {a.icao: a for a in db.scalars(select(Aerodrome).where(Aerodrome.icao.in_(groups)))}
+    pts = {p.ident: p for p in db.scalars(select(NavPoint).where(NavPoint.kind == "AD", NavPoint.ident.in_(groups)))}
+    airports = []
+    for icao, facilities in sorted(groups.items()):
+        a = ads.get(icao) or pts.get(icao)
+        if a:  # prefiksów spoza bazy lotnisk (np. 3-literowych z USA) nie umiemy postawić na mapie
+            airports.append({"icao": icao, "name": a.name, "lat": a.lat, "lon": a.lon, "facilities": facilities})
+    return {"airports": airports, "firs": online_firs(ctrls),
             "updated": data.get("general", {}).get("update_timestamp")}
 
 
