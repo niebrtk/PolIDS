@@ -22,7 +22,7 @@ def parse_icao_airlines(text: str) -> list[dict]:
     return out
 
 
-def import_icao_airlines(db: Session, path: Path) -> int:
+def import_icao_airlines(db: Session, path: Path) -> dict:
     text = read_text(path)
     rows = parse_icao_airlines(text)
     if not rows and len(text.strip().splitlines()) == 1:
@@ -31,4 +31,4 @@ def import_icao_airlines(db: Session, path: Path) -> int:
     for r in rows:
         db.merge(Callsign(source="sector-file", **r))
     db.commit()
-    return len(rows)
+    return {"callsigns": len(rows)}
