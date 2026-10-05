@@ -12,18 +12,17 @@
    },
    "items": [
     "Controllers online & bookings...CHECK",
-    "Overview of traffic (VatSpy/Scout/Radar/Glasses)...CHECK",
+    "Self-checkin at Core...CHECK",
+    "Overview of traffic (VATSIM Radar/VatSpy/VatGlasses)...CHECK",
     "Weather and NOTAMs...CHECK",
-    "Discord...LOGIN",
     "EuroScope, secondary, active runways...LOGIN, SETUP",
     "Audio client...CONNECT",
-    "vATIS: Runways, NOTAMs, APT CONDs...PREPARE",
+    "VACS...CONNECT",
     "Above/below controllers: intent to open...COORDINATE",
     "Traffic in sector...NOTE & PLAN",
     "EuroScope active frequency...PRIME",
     "Audio client frequency and connection...CHECK",
-    "CPDLC...CONNECT",
-    "vATIS...CONNECT",
+    "CPDLC/DCL...CONNECT",
     "Above/below controllers: open, ready for traffic...COORDINATE",
     "ATC channel <tt>/online</tt>...SEND",
     "Traffic in sector - <tt>.contactme</tt> or coordinate and transfer"
@@ -46,8 +45,7 @@
     "Pilots: contact above/downstream controller or advisory...TRANSMIT & TRANSFER",
     "Voice & text announcement: <i>&lt;station&gt; now closed</i>...TRANSMIT",
     "ATC channel <tt>/closed</tt>...SEND",
-    "EuroScope, audio client, vATIS...DISCONNECT & CLOSE",
-    "Discord coordination channel...LEAVE"
+    "EuroScope, audio client, VACS...DISCONNECT & CLOSE"
    ]
   },
   {
@@ -93,7 +91,7 @@
     "Last departure...INPUT:NOTE",
     "Old runway in EuroScope lists...SET",
     "Runway configuration EuroScope...CHANGE",
-    "vATIS...UPDATE",
+    "ATIS...UPDATE",
     "Amend departure clearances...TRANSMIT"
    ]
   }
