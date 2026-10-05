@@ -1,0 +1,16 @@
+{
+  "_uwaga": "Domyslna checklista otwarcia stanowiska. Klucz DEFAULT dotyczy wszystkich lotnisk, mozna dodac klucze ICAO, np. EPWA.",
+  "DEFAULT": [
+    "Sprawdź METAR / TAF i trend",
+    "Ustal pas w użyciu (porównaj z pasem sugerowanym)",
+    "Przejrzyj NOTAM-y lotniska",
+    "Sprawdź INOP i ograniczenia",
+    "Ustaw ATIS / sprawdź kod ATIS",
+    "Skoordynuj z sąsiednimi stanowiskami",
+    "Sprawdź QNH regionalne i poziom przejściowy"
+  ],
+  "EPWA": [
+    "Sprawdź konfigurację pasów 33/29 lub 15/11",
+    "Ustal procedury SID/STAR w użyciu"
+  ]
+}

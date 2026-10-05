@@ -1,0 +1,97 @@
+from datetime import date
+
+from backend.app.importers.ese import parse_ese
+from backend.app.importers.navdata import parse_airways
+from backend.app.importers.sct import parse_coord, parse_sct
+from backend.app.services.airac import current_airac
+from backend.app.services.metar import parse_metar, qfe_from_qnh
+from backend.app.services.notam import split_notams
+from backend.app.services.runways import suggest_runway, wind_components
+
+
+def test_metar_basic():
+    m = parse_metar("EPWA 051630Z 29012G25KT 250V320 6000 -RA SCT012 BKN025CB 12/09 Q1008 NOSIG")
+    assert (m.station, m.wind_dir, m.wind_speed, m.wind_gust) == ("EPWA", 290, 12, 25)
+    assert (m.wind_var_from, m.wind_var_to) == (250, 320)
+    assert m.visibility_m == 6000 and m.weather == ["-RA"]
+    assert m.clouds[1] == {"cover": "BKN", "base_ft": 2500, "type": "CB"}
+    assert m.ceiling_ft == 2500 and m.flight_category == "MVFR"
+    assert (m.temperature, m.dewpoint, m.qnh) == (12, 9, 1008)
+    assert m.trend == "NOSIG"
+
+
+def test_metar_cavok_negative_temp_rvr():
+    m = parse_metar("METAR EPKK 051630Z VRB02KT CAVOK M03/M05 Q1021")
+    assert m.wind_variable and m.wind_dir is None and m.cavok
+    assert (m.temperature, m.dewpoint) == (-3, -5) and m.flight_category == "VFR"
+    m = parse_metar("EPGD 051630Z 00000KT 0300 R29/0550N FG VV001 05/05 Q1015")
+    assert m.rvr[0]["runway"] == "29" and m.flight_category == "LIFR"
+
+
+def test_qfe():
+    assert qfe_from_qnh(1013, 362) == 1000
+
+
+def test_wind_components_and_suggestion():
+    head, cross = wind_components(290, 20, 295)
+    assert head > 19 and abs(cross) < 2
+    head, cross = wind_components(90, 10, 0)
+    assert abs(head) < 0.01 and cross == 10
+    rwys = [{"designator": "11", "heading": 115, "preferred": 0}, {"designator": "29", "heading": 295, "preferred": 0},
+            {"designator": "15", "heading": 152, "preferred": 0}, {"designator": "33", "heading": 332, "preferred": 1}]
+    best, _ = suggest_runway(rwys, 280, 15)
+    assert best["designator"] == "29"
+    best, reason = suggest_runway(rwys, 120, 2)
+    assert best["designator"] == "33" and "preferowany" in reason
+
+
+def test_airac():
+    assert current_airac(date(2026, 10, 5))["ident"] == "2610"
+    assert current_airac(date(2026, 10, 5))["effective"] == "2026-10-01"
+    assert current_airac(date(2026, 1, 22))["ident"] == "2601"
+
+
+def test_sct_coords_and_points():
+    assert parse_coord("N052.10.17.000") == 52.171389
+    assert parse_coord("W001.30.00.000") == -1.5
+    pts = parse_sct("[VOR]\nWAR 113.450 N052.10.17.000 E020.57.45.000\n[FIXES]\nSOXER N052.02.37.800 E019.56.05.900\n")
+    assert {p["ident"] for p in pts} == {"WAR", "SOXER"}
+
+
+def test_airways_both_directions():
+    row = "ABAKU\t51.676944\t19.081389\t14\tN871\tB\tOKENO\t51.569722\t18.593889\t\tN\tPOLON\t51.8\t19.656111\t\tY"
+    segs = list(parse_airways(row))
+    assert {(s["from_ident"], s["to_ident"]) for s in segs} == {("ABAKU", "OKENO"), ("ABAKU", "POLON")}
+
+
+def test_ese_sector_polygon():
+    text = """[POSITIONS]
+EPWW_S_CTR:Warszawa Radar:123.625:SWW:S:EPWW:CTR:::0000:0000
+[AIRSPACE]
+SECTORLINE:1
+COORD:N052.00.00.000:E019.00.00.000
+COORD:N052.00.00.000:E020.00.00.000
+SECTORLINE:2
+COORD:N053.00.00.000:E020.00.00.000
+COORD:N052.00.00.000:E020.00.00.000
+SECTORLINE:3
+COORD:N053.00.00.000:E020.00.00.000
+COORD:N052.00.00.000:E019.00.00.000
+
+SECTOR:EPWW·TEST·000·095:00000:09500
+OWNER:SWW
+BORDER:1:2:3
+"""
+    data = parse_ese(text)
+    assert data["positions"][0]["position_id"] == "SWW"
+    s = data["sectors"][0]
+    assert (s["fir"], s["name"], s["upper_ft"], s["owners"]) == ("EPWW", "TEST", 9500, "SWW")
+    assert '"Polygon"' in s["geometry"] and s["geometry"].count("[") == 2 + 4
+
+
+def test_notam_split():
+    text = "(A1234/26 NOTAMN\nQ) EPWW/QMRLC/IV/NBO/A/000/999/5210N02058E005\nA) EPWA B) 2610050600 C) 2610051800\nE) RWY 11/29 CLSD)\n" \
+           "(A1235/26 NOTAMN\nA) EPWA B) 2610050600 C) PERM\nE) TWY A CLSD)"
+    n = split_notams(text)
+    assert [x["id"] for x in n] == ["A1234/26", "A1235/26"]
+    assert n[0]["fields"]["E"] == "RWY 11/29 CLSD"

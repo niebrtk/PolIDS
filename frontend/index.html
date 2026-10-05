@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>vPANDORA</title>
+  <link rel="stylesheet" href="/static/vendor/leaflet/leaflet.css">
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">vPANDORA</div>
+    <nav id="tabs" class="tabs">
+      <button data-tab="meteo">METEO</button>
+      <button data-tab="aip">AIP</button>
+      <button data-tab="aircraft">AIRCRAFT</button>
+      <button data-tab="callsign">CALLSIGN</button>
+      <button data-tab="aerodrome">AERODROME</button>
+      <button data-tab="map">MAP</button>
+      <button data-tab="inop">INOP</button>
+      <button data-tab="docs">DOCS</button>
+    </nav>
+    <div class="status">
+      <span id="airac" title="Aktualny cykl AIRAC"></span>
+      <span id="utc" class="clock"></span>
+    </div>
+  </header>
+  <main id="views"></main>
+  <script src="/static/vendor/leaflet/leaflet.js"></script>
+  <script type="module" src="/static/js/app.js"></script>
+</body>
+</html>

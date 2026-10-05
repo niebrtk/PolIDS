@@ -1,0 +1,38 @@
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import or_, select
+from sqlalchemy.orm import Session
+
+from ..database import get_db
+from ..models import AircraftType
+
+router = APIRouter(prefix="/api/aircraft", tags=["aircraft"])
+
+FIELDS = ["id", "icao", "iata", "manufacturer", "model", "aircraft_type", "engine_type", "engine_count",
+          "description", "wtc", "recat", "wingspan", "length", "height", "mtow", "mlw", "ceiling_ft",
+          "vmo_kt", "mmo", "use", "remarks", "source"]
+
+
+def _dict(a: AircraftType) -> dict:
+    return {k: getattr(a, k) for k in FIELDS}
+
+
+@router.get("")
+def search(q: str = "", wtc: str = "", recat: str = "", limit: int = 200, db: Session = Depends(get_db)):
+    stmt = select(AircraftType).order_by(AircraftType.icao, AircraftType.model).limit(min(limit, 2000))
+    if q:
+        like = f"%{q}%"
+        stmt = stmt.where(or_(AircraftType.icao.ilike(like), AircraftType.model.ilike(like),
+                              AircraftType.manufacturer.ilike(like), AircraftType.iata.ilike(like)))
+    if wtc:
+        stmt = stmt.where(AircraftType.wtc == wtc.upper())
+    if recat:
+        stmt = stmt.where(AircraftType.recat == recat.upper())
+    return [_dict(a) for a in db.scalars(stmt)]
+
+
+@router.get("/{aircraft_id}")
+def get_one(aircraft_id: int, db: Session = Depends(get_db)):
+    a = db.get(AircraftType, aircraft_id)
+    if not a:
+        raise HTTPException(404, "Nie ma takiego typu")
+    return _dict(a)

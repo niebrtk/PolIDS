@@ -1,0 +1,10 @@
+{
+  "_uwaga": "Przyblizony podzial na regiony QNH (do weryfikacji z AIP ENR 1.7 i edycji). QNH regionalne = najnizsze aktualne QNH z lotnisk regionu.",
+  "regions": [
+    {"name": "PÓŁNOC", "color": "#3fa7ff", "airports": ["EPGD", "EPSC", "EPSY", "EPBY", "EPMM"]},
+    {"name": "ZACHÓD", "color": "#ffb13f", "airports": ["EPPO", "EPZG", "EPWR", "EPKS"]},
+    {"name": "CENTRUM", "color": "#7cff6b", "airports": ["EPWA", "EPMO", "EPLL", "EPRA"]},
+    {"name": "WSCHÓD", "color": "#ff6bd5", "airports": ["EPLB", "EPRZ", "EPSY"]},
+    {"name": "POŁUDNIE", "color": "#ff5c5c", "airports": ["EPKK", "EPKT", "EPRZ"]}
+  ]
+}
