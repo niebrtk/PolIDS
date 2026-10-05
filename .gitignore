@@ -8,11 +8,3 @@ venv/
 # baza tworzona lokalnie przy starcie
 data/*.db
 data/*.db-journal
-
-# pliki sektorowe / navdata EuroScope (licencja GNG nie pozwala ich publikować)
-data/import/*
-!data/import/README.md
-
-# PDF-y (ICAO Doc 4444, 9432 itd. są objęte prawami autorskimi)
-data/docs/*
-!data/docs/README.md

@@ -20,9 +20,7 @@ Dokumentacja API (Swagger) po uruchomieniu: <http://127.0.0.1:8000/docs>
 
 1. Zainstaluj **Python 3.11 lub nowszy** z <https://www.python.org/downloads/> (zaznacz „Add python.exe to PATH”).
 2. Pobierz kod (zielony przycisk *Code → Download ZIP* na GitHubie albo `git clone`) i przełącz się na tę gałąź.
-3. Skopiuj swoje pliki z pakietu sektorowego do `data\import\` (lista w [data/import/README.md](data/import/README.md)):
-   `EPWW-*.sct`, `EPWW-*.ese`, `airway.txt`, `isec.txt`, `icao.txt`, `ICAO_Airlines.txt`, `ICAO_Aircraft.json`.
-   Bez nich aplikacja też działa, tylko bez sektorów, dróg lotniczych i pełnej bazy callsignów.
+3. Pliki sektorowe EPWW i navdata są już w `data\import\`. Przy nowej sektorówce podmień je tam (lista w [data/import/README.md](data/import/README.md)).
 4. Kliknij dwukrotnie **`run.bat`**. Za pierwszym razem utworzy środowisko `.venv`, zainstaluje biblioteki,
    zbuduje bazę `data\vpandora.db` (import navdata trwa kilkanaście sekund) i otworzy <http://127.0.0.1:8000>.
 
@@ -80,8 +78,8 @@ vpandora/
 │   └── vendor/leaflet/        # Leaflet lokalnie (działa bez CDN)
 ├── data/
 │   ├── seed/                  # dane startowe w repo (CSV/JSON)
-│   ├── import/                # Twoje pliki EuroScope (poza repo)
-│   └── docs/                  # PDF-y (poza repo)
+│   ├── import/                # pliki EuroScope: sektorówka EPWW, navdata
+│   └── docs/                  # PDF-y dla zakładki DOCS
 ├── scripts/                   # odświeżanie danych startowych
 ├── run.bat / run.sh
 └── requirements.txt
@@ -105,4 +103,4 @@ vpandora/
   [vatger/atciss](https://github.com/vatger/atciss) (MIT).
 - Lotniska, pasy, pomoce nawigacyjne: [OurAirports](https://ourairports.com/data/) (domena publiczna).
 - Leaflet (BSD-2), podkład CARTO/OpenStreetMap (ODbL).
-- Pliki GNG/EuroScope oraz dokumenty ICAO **nie są** dołączone do repozytorium.
+- Pliki EuroScope (pakiet sektorowy PL vACC / GNG) są w `data/import/`, PDF-y w `data/docs/`.

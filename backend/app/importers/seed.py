@@ -1,5 +1,5 @@
 """Wypełnianie bazy: dane startowe z data/seed/ (wersjonowane w repo) oraz pliki
-użytkownika z data/import/ (pliki sektorowe, navdata EuroScope; NIE są w repo).
+z data/import/ (pliki sektorowe i navdata EuroScope).
 
 Uruchamiane automatycznie przy starcie aplikacji. Ręcznie:
     python -m backend.app.importers.seed            # import nowych/zmienionych plików

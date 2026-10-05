@@ -2,4 +2,4 @@
 
 Wrzuć tu PDF-y (np. ICAO Doc 4444, Doc 9432, instrukcje PL vACC). Podfolder = kategoria w zakładce DOCS,
 np. `data/docs/ICAO/Doc4444.pdf`. Można je też dodać przez przycisk w aplikacji.
-Pliki nie trafiają do repozytorium (prawa autorskie).
+Pliki są trzymane w repozytorium.

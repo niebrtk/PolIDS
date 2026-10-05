@@ -1,5 +1,5 @@
 """Import callsignów z pliku ICAO_Airlines.txt dołączanego do pakietów sektorowych EuroScope
-(format: ICAO<TAB>NAZWA<TAB>TELEFONIA<TAB>KRAJ). Plik trzymaj lokalnie w data/import/."""
+(format: ICAO<TAB>NAZWA<TAB>TELEFONIA<TAB>KRAJ). Plik leży w data/import/."""
 
 from pathlib import Path
 

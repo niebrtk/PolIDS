@@ -1,5 +1,5 @@
 """Import globalnych danych nawigacyjnych EuroScope (pakiet GNG): isec.txt (punkty),
-airway.txt (drogi lotnicze) i icao.txt (lotniska). Pliki trzymaj lokalnie w data/import/."""
+airway.txt (drogi lotnicze) i icao.txt (lotniska). Pliki leżą w data/import/."""
 
 from pathlib import Path
 

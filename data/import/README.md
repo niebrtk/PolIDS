@@ -1,7 +1,7 @@
 # data/import
 
 Tu wrzuć pliki z pakietu sektorowego EuroScope (PL vACC / GNG). Aplikacja wczyta je przy starcie
-(i ponownie, gdy plik się zmieni). Pliki **nie trafiają do repozytorium** (licencja GNG/AeroNav).
+(i ponownie, gdy plik się zmieni). Pliki są trzymane w repozytorium, więc po sklonowaniu aplikacja ma od razu pełne dane.
 
 | Plik | Co daje |
 |------|---------|

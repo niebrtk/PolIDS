@@ -1,7 +1,6 @@
 """Import punktów (VOR, NDB, FIX) z pliku sektorowego EuroScope (.sct / .sct2).
 
-Pliki sektorowe PL vACC trzymaj lokalnie w data/import/ (nie wrzucaj ich do repozytorium:
-licencja GNG/AeroNav zabrania redystrybucji)."""
+Pliki sektorowe PL vACC leżą w data/import/."""
 
 import re
 from pathlib import Path

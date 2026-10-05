@@ -26,7 +26,7 @@ export default {
     const load = async () => {
       const docs = await api("/api/docs");
       if (!docs.length) {
-        list.innerHTML = `<p class="hint">Brak dokumentów. Dodaj np. ICAO Doc 4444 i Doc 9432 (nie są dołączone do repozytorium ze względu na prawa autorskie).</p>`;
+        list.innerHTML = `<p class="hint">Brak dokumentów. Dodaj np. ICAO Doc 4444 i Doc 9432 (wrzuć PDF do data/docs/ albo dodaj formularzem obok).</p>`;
         return;
       }
       const groups = {};
