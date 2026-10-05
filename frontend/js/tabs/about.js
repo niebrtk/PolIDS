@@ -1,6 +1,9 @@
 import { api, esc, h } from "../api.js";
 
 const CHANGES = [
+  ["05.10.2026", "RADIO: kto jest online i rezerwacje (VATSIM), mapa EPWW ACC, FIR-y sąsiednie jako podzakładki, FIS w EPWW ACC."],
+  ["05.10.2026", "METEO: TAF w liniach, mapa QNH jak w PANDORZE. AERODROME: LVP, rezerwacje, NOTAM tylko dla lotniska."],
+  ["05.10.2026", "MAP: samoloty z VATSIM i ich trasy, granice FIR. CALLSIGN: CARGO / MIL. AIRCRAFT: zdjęcia lokalne."],
   ["05.10.2026", "Wygląd wzorowany na PANDORZE: zielone menu, podmenu, kolorowane METAR-y."],
   ["05.10.2026", "Import sektorówki EPWW, navdata EuroScope, bazy callsignów i typów samolotów."],
   ["05.10.2026", "Pierwsza wersja vPANDORA do testów lokalnych."],
@@ -21,7 +24,7 @@ export default {
       const st = await api("/api/status").catch(() => ({ counts: {} }));
       const c = st.counts;
       pane.querySelector(".info").innerHTML = `
-        Wersja oprogramowania: 0.2.0<br>
+        Wersja oprogramowania: 0.3.0<br>
         Cykl AIRAC: ${esc(ctx.config.airac.ident)} (od ${esc(ctx.config.airac.effective)})<br><br>
         Dane: ${c.aerodromes ?? "–"} lotnisk, ${c.aircraft_types ?? "–"} typów samolotów, ${c.callsigns ?? "–"} callsignów,<br>
         ${c.nav_points ?? "–"} punktów, ${c.airway_segments ?? "–"} odcinków dróg, ${c.sectors ?? "–"} sektorów, ${c.atc_positions ?? "–"} stanowisk ATC<br><br>

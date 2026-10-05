@@ -11,6 +11,7 @@ Tu wrzuć pliki z pakietu sektorowego EuroScope (PL vACC / GNG). Aplikacja wczyt
 | `isec.txt` | punkty nawigacyjne z całego świata (trasy) |
 | `icao.txt` | lotniska z całego świata (trasy) |
 | `ICAO_Airlines.txt` | baza callsignów (zakładka CALLSIGN) |
+| `GRpluginOperatorInfo.txt` | oznaczenie operatorów CARGO (`C`) i wojskowych (`Mil`) w zakładce CALLSIGN |
 | `ICAO_Aircraft.json` | typy samolotów z WTC / RECAT-EU / wymiarami (zakładka AIRCRAFT) |
 
 Ponowny import wszystkiego: `python -m backend.app.importers.seed --force`

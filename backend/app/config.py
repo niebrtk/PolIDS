@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     database_url: str = f"sqlite:///{(DATA_DIR / 'vpandora.db').as_posix()}"
     seed_dir: Path = DATA_DIR / "seed"
     docs_dir: Path = DATA_DIR / "docs"
+    photos_dir: Path = DATA_DIR / "photos"
     frontend_dir: Path = ROOT_DIR / "frontend"
 
     default_aerodrome: str = "EPWA"
@@ -37,6 +38,7 @@ class Settings(BaseSettings):
     aip_vfr_url: str = "https://docs.pansa.pl/ais/eaipvfr/AIRAC%20AMDT%20VFR%2010-26_2026_10_01/index-v2.html"
     aip_mil_url: str = "https://docs.pansa.pl/ais/eaipmil/AIRAC%20AMDT%20MIL%2010-26_2026_10_01/index-v2.html"
     inop_url: str = "https://om.plvacc.pl/"
+    inop_hide_footer_px: int = 150  # ile pikseli dołu strony INOP zasłonić (czerwona stopka om.plvacc.pl)
     imgw_url: str = "https://awiacja.imgw.pl/"
     sectors_url: str = "https://plvacc.pl/acc-sectors/"
 

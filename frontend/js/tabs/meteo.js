@@ -1,4 +1,4 @@
-import { BASEMAPS, api, esc, h, iframeWithFallback, subtabs } from "../api.js";
+import { api, esc, h, iframeWithFallback, splitTaf, subtabs } from "../api.js";
 
 const PL_CIV = "EPWA EPMO EPKK EPKT EPGD EPPO EPWR EPLL EPRZ EPLB EPSC EPBY EPSY EPZG EPRA";
 const PL_MIL = "EPCE EPDA EPDE EPIR EPKS EPLK EPLY EPMB EPMI EPMM EPOK EPPR EPPW EPSN EPTM";
@@ -25,6 +25,12 @@ export function colorize(raw) {
   }).join(" ");
 }
 
+// TAF: każdy okres zmian w nowej linii, wcięty pod pierwszą linią
+export function wxLines(kind, raw) {
+  const lines = kind === "taf" ? splitTaf(raw) : [raw];
+  return lines.map((l, i) => (i ? `<span class="cont">${colorize(l)}</span>` : colorize(l))).join("<br>");
+}
+
 function wxList(kind, defaults, key) {
   return (pane) => {
     pane.append(h(`<div>
@@ -42,7 +48,7 @@ function wxList(kind, defaults, key) {
       localStorage.setItem(key, $(".ids").value.trim());
       try {
         const rows = await api(`/api/meteo/${kind}?ids=${ids}`);
-        $(".wx").innerHTML = rows.map((r) => `<div class="row">${r.raw ? r.raw.split("\n").map((l) => colorize(l.trim())).join("<br>&nbsp;&nbsp;&nbsp;&nbsp;") : `<span class="st">${esc(r.icao)}</span> <span class="nil">NIL</span>`}</div>`).join("");
+        $(".wx").innerHTML = rows.map((r) => `<div class="row">${r.raw ? wxLines(kind, r.raw) : `<span class="st">${esc(r.icao)}</span> <span class="nil">NIL</span>`}</div>`).join("");
         $(".upd").textContent = "Aktualizacja " + new Date().toISOString().slice(11, 16) + "Z";
       } catch (e) { $(".wx").innerHTML = `<p class="error">${esc(e.message)}</p>`; }
     };
@@ -54,40 +60,40 @@ function wxList(kind, defaults, key) {
   };
 }
 
+// Mapa QNH jak w PANDORZE: czarne tło, ponumerowane rejony, duże QNH w hPa, pod nim mmHg i inHg,
+// małe liczby nad nim: najniższe i najwyższe QNH z lotnisk rejonu.
 function qnhMap(pane) {
-  pane.append(h(`<div class="mapwrap"><div class="mapside"><h4>QNH REGIONALNE</h4><div class="regions">Ładowanie…</div>
-    <p class="hint note"></p></div><div class="map"></div></div>`));
-  const map = L.map(pane.querySelector(".map"), { zoomSnap: 0.25 }).setView([52.0, 19.3], 6.25);
-  BASEMAPS.dark(L).addTo(map);
+  pane.append(h(`<div class="mapwrap"><div class="map qnhmap"></div><div class="qnhside">
+    <div class="stamp"></div><table class="data regions"></table><p class="hint note"></p></div></div>`));
+  const map = L.map(pane.querySelector(".map"), { zoomSnap: 0.25, attributionControl: false });
   const mmhg = (q) => Math.round(q * 0.750062);
   const inhg = (q) => (q * 0.0295300).toFixed(2);
-  // kontury sektorów ACC jako tło, jak na mapie QNH w PANDORZE
-  api("/api/nav/sectors?fir=EPWW&level_ft=30000").then((gj) => L.geoJSON(gj, { style: { color: "#3f8f2f", weight: 1, fill: false }, interactive: false }).addTo(map)).catch(() => {});
-  api("/api/aerodromes").then(async (ads) => {
-    const pos = Object.fromEntries(ads.map((a) => [a.icao, a]));
-    try {
-      const data = await api("/api/meteo/qnh-regions");
-      pane.querySelector(".note").textContent = data.note || "";
-      pane.querySelector(".regions").innerHTML = `<table class="data">${data.regions.map((r) =>
-        `<tr><td class="sc">${esc(r.name)}</td><td class="num" style="color:var(--yellow);font-size:18px">${r.qnh ?? "–"}</td></tr>`).join("")}</table>`;
-      data.regions.forEach((r) => {
-        const pts = r.stations.map((s) => pos[s.icao]).filter(Boolean);
-        if (!pts.length) return;
-        r.stations.forEach((s) => {
-          const a = pos[s.icao];
-          if (!a) return;
-          L.circleMarker([a.lat, a.lon], { radius: 3, color: "#fff", weight: 1, fillOpacity: 1 }).addTo(map)
-            .bindTooltip(`${s.icao} ${s.qnh ?? "–"}`, { permanent: true, direction: "right", className: "lbl" });
-        });
-        const lat = pts.reduce((s, a) => s + a.lat, 0) / pts.length, lon = pts.reduce((s, a) => s + a.lon, 0) / pts.length;
-        if (r.qnh) L.tooltip({ permanent: true, direction: "center", className: "qnh" }).setLatLng([lat, lon])
-          .setContent(`${r.qnh}<br><span style="font-size:13px">${mmhg(r.qnh)} ${inhg(r.qnh)}</span>`).addTo(map);
-      });
-    } catch (e) {
-      pane.querySelector(".regions").innerHTML = `<span class="error">${esc(e.message)}</span>`;
-    }
-  });
+  const layer = L.layerGroup().addTo(map);
+  const load = async () => {
+    let data;
+    try { data = await api("/api/meteo/qnh-regions"); } catch (e) { pane.querySelector(".stamp").innerHTML = `<span class="error">${esc(e.message)}</span>`; return; }
+    layer.clearLayers();
+    const all = L.featureGroup();
+    data.regions.forEach((r) => {
+      const poly = L.geoJSON(r.geometry, { interactive: false, style: { color: "#5f9f5f", weight: 1.2, fill: false } }).addTo(layer);
+      all.addLayer(poly);
+      L.marker([r.num[1], r.num[0]], { interactive: false, icon: L.divIcon({ className: "qnhnum", html: `<div>${r.id}</div>`, iconSize: null }) }).addTo(layer);
+      const html = r.qnh ? `<div class="mm"><span>${r.qnh}</span><span>${r.max}</span></div><div class="big">${r.qnh}</div><div class="sub">${mmhg(r.qnh)} ${inhg(r.qnh)}</div>`
+        : `<div class="big nil">----</div>`;
+      L.marker([r.label[1], r.label[0]], { interactive: false, icon: L.divIcon({ className: "qnhlabel", html: `<div>${html}</div>`, iconSize: null }) }).addTo(layer);
+      r.stations.filter((s) => s.lat !== null).forEach((s) => L.circleMarker([s.lat, s.lon], { radius: 3, color: "#cfe0ff", weight: 1, fillOpacity: 1 })
+        .bindTooltip(`${s.icao} ${s.qnh ?? "–"}`, { direction: "right", className: "lbl" }).addTo(layer));
+    });
+    if (!map._loaded) map.fitBounds(all.getBounds(), { padding: [10, 10] });
+    pane.querySelector(".stamp").innerHTML = `Dane z ${new Date().toISOString().slice(0, 16).replace("T", " ")}Z` + (data.error ? `<br><span class="error">${esc(data.error)}</span>` : "");
+    pane.querySelector(".regions").innerHTML = `<thead><tr><th>Rejon</th><th>QNH</th><th>Lotniska</th></tr></thead><tbody>${data.regions.map((r) =>
+      `<tr><td class="num">${r.id}</td><td class="num" style="color:var(--yellow)">${r.qnh ?? "–"}</td><td class="mono" style="font-size:11px">${r.stations.map((s) => `${s.icao} ${s.qnh ?? "–"}`).join("<br>")}</td></tr>`).join("")}</tbody>`;
+    pane.querySelector(".note").textContent = data.note || "";
+  };
+  load();
+  const timer = setInterval(load, 300000);
   setTimeout(() => map.invalidateSize(), 50);
+  return { destroy: () => { clearInterval(timer); map.remove(); } };
 }
 
 const windy = (overlay) => (pane) => {

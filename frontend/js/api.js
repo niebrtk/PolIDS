@@ -83,3 +83,41 @@ export const BASEMAPS = {
   osm: L => L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
     attribution: "© OpenStreetMap", maxZoom: 19 }),
 };
+
+// --- VATSIM: wspólny cache dla wszystkich zakładek (data feed odświeża się co ~15 s, rezerwacje rzadziej)
+const shared = {};
+function cached(key, ttl, fn) {
+  const hit = shared[key];
+  if (hit && Date.now() - hit.t < ttl) return hit.p;
+  const p = fn().catch((e) => { delete shared[key]; throw e; });
+  shared[key] = { t: Date.now(), p };
+  return p;
+}
+export const vatsimOnline = () => cached("online", 30000, () => api("/api/vatsim/online"));
+export const vatsimBookings = () => cached("bookings", 300000, () => api("/api/vatsim/bookings?prefix=EP&hours=24"));
+export const atcPositions = () => cached("positions", 3600000, () => api("/api/nav/positions"));
+
+export const hhmm = (iso) => (iso ? new Date(iso).toISOString().slice(11, 16) + "Z" : "–");
+
+// Opis do dymka po najechaniu na stanowisko: kto jest zalogowany / kto zarezerwował.
+export function positionTip(on, books = []) {
+  const lines = [];
+  if (on) lines.push(`ONLINE: ${on.name || "?"} (CID ${on.cid ?? "?"})`, `${on.callsign} ${on.frequency}, od ${hhmm(on.logon_time)}`);
+  books.forEach((b) => lines.push(`${b.active ? "BOOKING TERAZ" : "BOOKING"}: CID ${b.cid}${b.name ? " " + b.name : ""}`,
+    `${b.callsign} ${hhmm(b.start)}–${hhmm(b.end)}${b.type && b.type !== "booking" ? " (" + b.type + ")" : ""}`));
+  return lines.join("\n");
+}
+
+// TAF: każda grupa zmian (BECMG, TEMPO, PROB, FM) w osobnej linii.
+export function splitTaf(raw) {
+  if (!raw) return [];
+  const tokens = raw.replace(/\s+/g, " ").trim().split(" ");
+  const lines = [[]];
+  tokens.forEach((t, i) => {
+    const prev = tokens[i - 1];
+    const starts = /^(BECMG|TEMPO|FM\d{6}|PROB\d{2})$/.test(t) && !(t === "TEMPO" && /^PROB\d{2}$/.test(prev));
+    if (starts && lines[lines.length - 1].length) lines.push([]);
+    lines[lines.length - 1].push(t);
+  });
+  return lines.map((l) => l.join(" "));
+}

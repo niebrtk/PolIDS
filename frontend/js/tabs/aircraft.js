@@ -3,16 +3,16 @@ import { api, debounce, esc, fmt, h, letterMenu } from "../api.js";
 const RECAT = {
   A: "Super Heavy", B: "Upper Heavy", C: "Lower Heavy", D: "Upper Medium", E: "Lower Medium", F: "Light",
 };
-const DESC_KIND = { L: "samolot lądowy", S: "wodnosamolot", A: "amfibia", H: "śmigłowiec", G: "wiatrakowiec", T: "tiltrotor" };
-const DESC_ENG = { J: "odrzutowy", T: "turbośmigłowy", P: "tłokowy", E: "elektryczny", R: "rakietowy" };
+const searchName = (a) => `${a.manufacturer || ""} ${a.model || a.icao}`.trim();
 
-function describe(d) {
-  if (!d || d.length < 3) return "";
-  return `${DESC_KIND[d[0]] || d[0]}, ${d[1]} × silnik ${DESC_ENG[d[2]] || d[2]}`;
-}
-
-function photoUrl(a) {
-  return `https://www.jetphotos.com/photo/keyword/${encodeURIComponent(`${a.manufacturer || ""} ${a.model || a.icao}`.trim())}`;
+// Rekord w dwóch liniach: kod ICAO duży po lewej, reszta jednolitą czcionką
+function record(a, i) {
+  return `<div class="ac-rec" data-i="${i}">
+    <div class="ac-icao">${esc(a.icao)}</div>
+    <div class="ac-l1">${esc(a.manufacturer || "")} ${esc(a.model)}</div>
+    <div class="ac-l2">WTC <b>${esc(a.wtc || "–")}</b> · RECAT-EU <b class="recat-${esc(a.recat)}">${esc(a.recat || "–")}</b>
+      · rozp. ${fmt(a.wingspan, 1, " m")} · dł. ${fmt(a.length, 1, " m")} · wys. ${fmt(a.height, 1, " m")} · MTOW ${a.mtow ? Math.round(a.mtow / 100) / 10 + " t" : "–"}</div>
+  </div>`;
 }
 
 export default {
@@ -27,10 +27,7 @@ export default {
           <select class="recat"><option value="">RECAT-EU: wszystkie</option>${Object.entries(RECAT).map(([k, v]) => `<option value="${k}">${k} – ${v}</option>`).join("")}</select>
           <span class="hint count"></span>
         </div>
-        <table class="data"><thead><tr>
-          <th>ICAO</th><th>Producent</th><th>Model</th><th>Opis</th><th>WTC</th><th>RECAT-EU</th>
-          <th>Rozpiętość [m]</th><th>Długość [m]</th><th>Wysokość [m]</th><th>MTOW [kg]</th>
-        </tr></thead><tbody></tbody></table>
+        <div class="ac-list"></div>
       </div>
       <div class="detail"><div class="card"><p class="hint">Wybierz typ z listy, żeby zobaczyć szczegóły i zdjęcie.</p></div></div>
     </div></div>`);
@@ -45,24 +42,18 @@ export default {
       let data;
       try {
         data = await api(`/api/aircraft?${qs}`);
-      } catch (e) { $("tbody").innerHTML = `<tr><td colspan="10" class="error">${esc(e.message)}</td></tr>`; return; }
+      } catch (e) { $(".ac-list").innerHTML = `<p class="error">${esc(e.message)}</p>`; return; }
       if (my !== seq) return; // starsza odpowiedź przyszła po nowszej
       rows = data;
       $(".count").textContent = `${rows.length} typów${rows.length === 500 ? " (pokazano pierwsze 500)" : ""}`;
-      $("tbody").innerHTML = rows.map((a, i) => `<tr data-i="${i}">
-        <td class="mono"><b>${esc(a.icao)}</b></td><td>${esc(a.manufacturer)}</td><td>${esc(a.model)}</td>
-        <td class="mono">${esc(a.description)}</td><td class="mono">${esc(a.wtc)}</td>
-        <td class="mono recat-${esc(a.recat)}"><b>${esc(a.recat)}</b></td>
-        <td class="num">${fmt(a.wingspan, 2)}</td><td class="num">${fmt(a.length, 2)}</td><td class="num">${fmt(a.height, 2)}</td>
-        <td class="num">${fmt(a.mtow, 0)}</td></tr>`).join("");
+      $(".ac-list").innerHTML = rows.map(record).join("");
     };
 
     const show = (a) => {
-      const url = photoUrl(a);
       $(".detail").innerHTML = `<div class="card">
-        <h3>${esc(a.icao)} · ${esc(a.manufacturer)} ${esc(a.model)}</h3>
+        <h3><span class="ac-icao" style="font-size:26px">${esc(a.icao)}</span> ${esc(a.manufacturer)} ${esc(a.model)}</h3>
+        <div class="photo-box"><span class="hint">Ładowanie zdjęcia…</span></div>
         <dl class="props">
-          <dt>Opis ICAO</dt><dd>${esc(a.description || "–")} <span class="hint">${esc(describe(a.description))}</span></dd>
           <dt>WTC (ICAO)</dt><dd>${esc(a.wtc || "–")}</dd>
           <dt>RECAT-EU</dt><dd class="recat-${esc(a.recat)}">${esc(a.recat || "–")} ${a.recat ? "– " + RECAT[a.recat] : ""}</dd>
           <dt>Rozpiętość</dt><dd>${fmt(a.wingspan, 2, " m")}</dd>
@@ -73,23 +64,27 @@ export default {
           <dt>Pułap</dt><dd>${fmt(a.ceiling_ft, 0, " ft")}</dd>
           <dt>Vmo / Mmo</dt><dd>${fmt(a.vmo_kt, 0, " kt")} / ${fmt(a.mmo, 2)}</dd>
           <dt>IATA</dt><dd>${esc(a.iata || "–")}</dd>
-          <dt>Źródło</dt><dd class="hint">${esc(a.source)}</dd>
-        </dl></div>
-        <div class="card" style="margin-top:12px">
-          <h3>Zdjęcie</h3>
-          <iframe class="photo" src="${esc(url)}" referrerpolicy="no-referrer"></iframe>
-          <p class="hint">Jeśli podgląd jest pusty, serwis blokuje osadzanie:
-            <a href="${esc(url)}" target="_blank" rel="noopener">JetPhotos ↗</a> ·
-            <a href="https://www.google.com/search?tbm=isch&q=${encodeURIComponent(`${a.manufacturer || ""} ${a.model}`)}" target="_blank" rel="noopener">Google Grafika ↗</a></p>
-        </div>`;
+        </dl></div>`;
+      const box = $(".photo-box");
+      const links = `<a href="https://www.jetphotos.com/photo/keyword/${encodeURIComponent(searchName(a))}" target="_blank" rel="noopener">JetPhotos ↗</a> ·
+        <a href="https://www.google.com/search?tbm=isch&q=${encodeURIComponent(searchName(a))}" target="_blank" rel="noopener">Google Grafika ↗</a>`;
+      api(`/api/aircraft/${a.id}/photo`).then((p) => {
+        if (current !== a) return;
+        box.innerHTML = `<img src="${esc(p.url)}" alt="${esc(searchName(a))}"><div class="hint">${p.page ? `<a href="${esc(p.page)}" target="_blank" rel="noopener">${esc(p.credit)}</a>` : esc(p.credit)} · ${links}</div>`;
+      }).catch((e) => {
+        if (current !== a) return;
+        box.innerHTML = `<p class="hint">${esc(e.message)}. Własne zdjęcie wrzuć do <span class="mono">data/photos/${esc(a.icao)}.jpg</span>. ${links}</p>`;
+      });
     };
+    let current = null;
 
-    $("tbody").addEventListener("click", (e) => {
-      const tr = e.target.closest("tr[data-i]");
-      if (!tr) return;
-      pane.querySelectorAll("tr.selected").forEach((x) => x.classList.remove("selected"));
-      tr.classList.add("selected");
-      show(rows[tr.dataset.i]);
+    $(".ac-list").addEventListener("click", (e) => {
+      const rec = e.target.closest(".ac-rec[data-i]");
+      if (!rec) return;
+      pane.querySelectorAll(".ac-rec.selected").forEach((x) => x.classList.remove("selected"));
+      rec.classList.add("selected");
+      current = rows[rec.dataset.i];
+      show(current);
     });
     $(".q").addEventListener("input", debounce(load));
     $(".wtc").addEventListener("change", load);

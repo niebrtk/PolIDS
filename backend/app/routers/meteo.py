@@ -1,8 +1,12 @@
 import json
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from ..config import settings
+from ..database import get_db
+from ..models import Aerodrome, NavPoint
 from ..services.http_cache import UpstreamError
 from ..services.metar import parse_metar
 from ..services.weather import get_metars, get_tafs
@@ -39,17 +43,23 @@ async def taf(ids: str = Query(...)):
 
 
 @router.get("/qnh-regions")
-async def qnh_regions():
+async def qnh_regions(db: Session = Depends(get_db)):
+    """Rejony QNH (data/seed/qnh_regions.json): QNH rejonu = najniższe QNH z jego lotnisk."""
     cfg = json.loads((settings.seed_dir / "qnh_regions.json").read_text("utf-8"))
     icaos = sorted({a for r in cfg["regions"] for a in r["airports"]})
+    error = None
     try:
         raw = await get_metars(icaos)
     except UpstreamError as exc:
-        raise HTTPException(502, f"Źródło METAR niedostępne: {exc}") from exc
+        raw, error = {}, f"Źródło METAR niedostępne: {exc}"
     qnh = {i: parse_metar(m).qnh for i, m in raw.items()}
+    pos = {a.icao: (a.lat, a.lon) for a in db.scalars(select(Aerodrome).where(Aerodrome.icao.in_(icaos)))}
+    for p in db.scalars(select(NavPoint).where(NavPoint.kind == "AD", NavPoint.ident.in_(icaos))):
+        pos.setdefault(p.ident, (p.lat, p.lon))
     regions = []
     for r in cfg["regions"]:
         vals = [qnh[a] for a in r["airports"] if qnh.get(a)]
-        regions.append({**r, "qnh": min(vals) if vals else None,
-                        "stations": [{"icao": a, "qnh": qnh.get(a)} for a in r["airports"]]})
-    return {"note": cfg.get("_uwaga"), "regions": regions}
+        regions.append({**r, "qnh": min(vals) if vals else None, "max": max(vals) if vals else None,
+                        "stations": [{"icao": a, "qnh": qnh.get(a), "lat": pos.get(a, (None, None))[0],
+                                      "lon": pos.get(a, (None, None))[1]} for a in r["airports"]]})
+    return {"note": cfg.get("_uwaga"), "regions": regions, "error": error}

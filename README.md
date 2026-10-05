@@ -10,15 +10,15 @@ Wygląd wzorowany na PANDORZE: czarne tło, kolumna zielonych przycisków menu i
 | Menu | Co jest | Skąd dane |
 |---|---|---|
 | **?** | wersja, AIRAC, stan bazy, ostatnie zmiany | API |
-| **RADIO** | częstotliwości stanowisk EPWW, lotnisk i sąsiadów, kto jest online | `.ese` + [VATSIM data feed](https://vatsim.dev/services/apis) |
-| **METEO** | METAR PL / MIL / INTL, TAF PL / INTL (kolorowane), QNH regionalne, Windy (wiatr, radar, satelita), IMGW AWIACJA | metar.vatsim.net / aviationweather.gov, awiacja.imgw.pl |
-| **AERODROME** | AWOS: róża wiatrów, QNH/QFE, widzialność, chmury, RVR, składowe wiatru, **pas sugerowany**, METAR/TAF, NOTAM, częstotliwości, checklista | METAR/TAF jw., NOTAM z cv.plvacc.pl, pasy z OurAirports, stanowiska z `.ese` |
+| **RADIO** | EPWW ACC (lista CTR i FIS + mapa sektorów z obsadą), lotniska (IFR, VFR, MIL), każdy FIR sąsiedni osobno; podświetlenie kto jest online i rezerwacji | `.ese`, [VATSIM data feed i ATC bookings](https://vatsim.dev/services/apis), granice FIR z VATSpy |
+| **METEO** | METAR PL / MIL / INTL, TAF PL / INTL (kolorowane, okresy zmian w osobnych liniach), mapa QNH jak w PANDORZE, Windy (wiatr, radar, satelita), IMGW AWIACJA | metar.vatsim.net / aviationweather.gov, awiacja.imgw.pl |
+| **AERODROME** | AWOS: róża wiatrów, QNH/QFE, widzialność, chmury, RVR, składowe wiatru, **pas sugerowany**, **wskaźnik LVP z powodem**, wiek METAR, TAF, NOTAM tylko dla lotniska, częstotliwości z obsadą i rezerwacjami, checklista | METAR/TAF jw., NOTAM z cv.plvacc.pl, VATSIM, pasy z OurAirports, stanowiska z `.ese`, progi LVP w `data/seed/lvp.json` |
 | **AD CIV / AD MIL / AD VFR** | eAIP PAŻP | iframe + „otwórz w nowej karcie” |
-| **CALLSIGN** | baza callsignów, podmenu A–Z | `ICAO_Airlines.txt` |
-| **AIRCRAFT** | typy: WTC, RECAT-EU, wymiary, MTOW, zdjęcie, podmenu A–Z | aircraft-database.com + `ICAO_Aircraft.json` |
-| **MAP** | sektory EPWW na wybranym FL, aktualna sektoryzacja z VATSIM, trasa z planu lotu po drogach lotniczych, VOR/NDB/FIX | `.sct`, `.ese`, `airway.txt`, `isec.txt` |
-| **INOP** | om.plvacc.pl | iframe |
-| **DOCS** | PDF-y otwierane w aplikacji, upload | `data/docs/` |
+| **CALLSIGN** | baza callsignów, podmenu A–Z, oznaczenie CARGO / MILITARY | `ICAO_Airlines.txt`, `GRpluginOperatorInfo.txt` |
+| **AIRCRAFT** | typy: WTC, RECAT-EU, wymiary, MTOW, zdjęcie, podmenu A–Z | aircraft-database.com + `ICAO_Aircraft.json`, zdjęcia w `data/photos/` (brakujące pobierane raz z Wikipedii) |
+| **MAP** | sektory EPWW na wybranym FL z aktualną obsadą, FIR-y sąsiednie online, samoloty z VATSIM (kliknięcie = plan lotu i trasa), trasa z planu lotu po drogach lotniczych, VOR/NDB/FIX | `.sct`, `.ese`, `airway.txt`, `isec.txt`, VATSIM, VATSpy |
+| **INOP** | om.plvacc.pl (bez dużej stopki; wysokość do ukrycia ustawiasz na pasku) | iframe |
+| **DOCS** | PDF-y z folderu `data/docs/` otwierane w aplikacji | `data/docs/` |
 | **EMERGENCY** | procedury awaryjne (czerwona ramka) | `data/seed/emergency.json` |
 
 Dokumentacja API (Swagger) po uruchomieniu: <http://127.0.0.1:8000/docs>
@@ -68,7 +68,7 @@ serwer NOTAM i klucz OpenAIP do nakładki lotniczej na mapie.
   albo `python -m backend.app.importers.seed --force`.
 - Lotniska/pasy/VOR z OurAirports: `python scripts/fetch_ourairports.py`, potem usuń `data/vpandora.db`.
 - Baza samolotów: `python scripts/build_aircraft_seed.py ŚCIEŻKA/do/aircraft-db`.
-- Konfiguracja bez kodu: `data/seed/qnh_regions.json` (regiony QNH), `data/seed/checklists.json` (checklisty),
+- Konfiguracja bez kodu: `data/seed/qnh_regions.json` (regiony QNH), `data/seed/lvp.json` (progi LVP), `data/seed/checklists.json` (checklisty),
   `data/seed/callsigns.csv`.
 
 ### Testy
@@ -113,11 +113,13 @@ vpandora/
   Wtedy działa przycisk „Otwórz w nowej karcie”. Docelowo można je pobierać przez backend.
 - Format odpowiedzi serwera NOTAM (cv.plvacc.pl) nie jest udokumentowany; parser dzieli tekst po
   nagłówkach `A1234/26 NOTAMN`, a przy innym formacie pokazuje całość.
-- Regiony QNH w `data/seed/qnh_regions.json` są przybliżone, do sprawdzenia z AIP ENR 1.7.
 - Pas sugerowany = największa składowa czołowa; preferencje pasów przy słabym wietrze (kolumna `preferred`)
   są w bazie, ale nie są jeszcze wypełnione dla żadnego lotniska.
 - QFE liczone w przybliżeniu z QNH i elewacji lotniska.
 - Brak logowania (aplikacja do użytku lokalnego / w sieci vACC).
+- API rezerwacji VATSIM podaje tylko CID. Imię i nazwisko przy rezerwacji widać, gdy ta osoba jest akurat zalogowana w sieci.
+- Rejony QNH (`data/seed/qnh_regions.json`) są odrysowane w przybliżeniu ze zrzutu ekranu PANDORY.
+- Progi LVP w `data/seed/lvp.json` to wartości domyślne do sprawdzenia z INOP EPWW (om.plvacc.pl).
 
 ## Licencje danych
 
@@ -125,4 +127,6 @@ vpandora/
   [vatger/atciss](https://github.com/vatger/atciss) (MIT).
 - Lotniska, pasy, pomoce nawigacyjne: [OurAirports](https://ourairports.com/data/) (domena publiczna).
 - Leaflet (BSD-2), podkład CARTO/OpenStreetMap (ODbL).
+- Granice FIR: [vatsimnetwork/vatspy-data-project](https://github.com/vatsimnetwork/vatspy-data-project) (CC BY-SA 4.0), plik `data/seed/vatspy_firs.geojson`.
+- Zdjęcia samolotów pobierane z Wikipedii; autor i licencja są na stronie artykułu podlinkowanej pod zdjęciem.
 - Pliki EuroScope (pakiet sektorowy PL vACC / GNG) są w `data/import/`, PDF-y w `data/docs/`.

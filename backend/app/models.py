@@ -86,6 +86,7 @@ class Callsign(Base):
     name: Mapped[str] = mapped_column(String(200), index=True)
     telephony: Mapped[str | None] = mapped_column(String(120), index=True)
     country: Mapped[str | None] = mapped_column(String(80))
+    category: Mapped[str | None] = mapped_column(String(10))  # CARGO / MIL (z GRpluginOperatorInfo.txt)
     source: Mapped[str | None] = mapped_column(String(40))
 
 

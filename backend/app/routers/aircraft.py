@@ -1,9 +1,11 @@
+import httpx
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..models import AircraftType
+from ..services.photos import fetch_photo, local_photo
 
 router = APIRouter(prefix="/api/aircraft", tags=["aircraft"])
 
@@ -31,6 +33,23 @@ def search(q: str = "", prefix: str = "", wtc: str = "", recat: str = "", limit:
     if recat:
         stmt = stmt.where(AircraftType.recat == recat.upper())
     return [_dict(a) for a in db.scalars(stmt)]
+
+
+@router.get("/{aircraft_id}/photo")
+async def photo(aircraft_id: int, db: Session = Depends(get_db)):
+    """Zdjęcie typu z data/photos/; przy pierwszym wywołaniu pobierane z Wikipedii i zapisywane lokalnie."""
+    a = db.get(AircraftType, aircraft_id)
+    if not a:
+        raise HTTPException(404, "Nie ma takiego typu")
+    if found := local_photo(a.icao):
+        return found
+    try:
+        found = await fetch_photo(a.icao, f"{a.manufacturer or ''} {a.model}".strip())
+    except (httpx.HTTPError, ValueError) as exc:
+        raise HTTPException(502, f"Nie udało się pobrać zdjęcia z Wikipedii: {exc}") from exc
+    if not found:
+        raise HTTPException(404, "Brak zdjęcia tego typu")
+    return found
 
 
 @router.get("/{aircraft_id}")

@@ -7,13 +7,11 @@ from sqlalchemy.orm import Session
 from ..config import settings
 from ..database import get_db
 from ..models import AirwaySegment, AtcPosition, NavPoint, Sector
-from ..services.http_cache import UpstreamError, fetch_text
+from ..services.http_cache import UpstreamError
 from ..services.route import RouteResolver
+from ..services.vatsim import get_feed, match_positions
 
 router = APIRouter(prefix="/api/nav", tags=["map"])
-
-VATSIM_DATA = "https://data.vatsim.net/v3/vatsim-data.json"
-
 
 @router.get("/route")
 def route(route: str = Query(..., min_length=3), db: Session = Depends(get_db)):
@@ -90,32 +88,22 @@ def sectors(fir: str = "EPWW", level_ft: int | None = None, db: Session = Depend
     return {"type": "FeatureCollection", "features": feats}
 
 
-def _match_online(controllers: list[dict], positions: dict[str, AtcPosition]) -> dict[str, dict]:
-    """Dopasowanie jak w EuroScope: prefiks callsigna, typ (końcówka) i częstotliwość."""
-    online = {}
-    for c in controllers:
-        cs, freq = c.get("callsign", ""), c.get("frequency", "")
-        for pid, p in positions.items():
-            if (p.prefix and cs.startswith(p.prefix) and cs.split("_")[-1] == p.callsign.split("_")[-1]
-                    and freq[:7] == p.frequency[:7]):
-                online[pid] = {"callsign": cs, "frequency": freq, "name": c.get("name"), "position": p.callsign}
-    return online
-
-
 @router.get("/sectors/online")
 async def sectors_online(fir: str = "EPWW", db: Session = Depends(get_db)):
     """Aktualna sektoryzacja: dla każdego sektora pierwsze zalogowane stanowisko z listy OWNER."""
     try:
-        data = json.loads(await fetch_text(VATSIM_DATA, 30))
+        data = await get_feed()
     except (UpstreamError, ValueError) as exc:
         raise HTTPException(502, f"VATSIM data feed niedostępny: {exc}") from exc
-    pos = _positions(db)
-    online = _match_online(data.get("controllers", []), pos)
+    positions = db.scalars(select(AtcPosition)).all()
+    online = match_positions(data.get("controllers", []), positions)
+    by_id = {p.position_id: online[p.callsign] | {"position": p.callsign}
+             for p in positions if p.callsign in online}
     result = {}
     for s in db.scalars(select(Sector).where(Sector.fir == fir.upper())):
         for o in s.owners.split(":"):
-            if o in online:
-                result[s.name] = {"position_id": o, **online[o]}
+            if o in by_id:
+                result[s.name] = {"position_id": o, **by_id[o]}
                 break
-    return {"online_positions": list(online.values()), "sector_owner": result,
+    return {"online_positions": list(by_id.values()), "sector_owner": result,
             "updated": data.get("general", {}).get("update_timestamp")}

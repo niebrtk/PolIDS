@@ -23,6 +23,7 @@ def config():
             "aip_ifr": settings.aip_ifr_url, "aip_vfr": settings.aip_vfr_url, "aip_mil": settings.aip_mil_url,
             "inop": settings.inop_url, "imgw": settings.imgw_url, "sectors": settings.sectors_url,
         },
+        "inop_hide_footer_px": settings.inop_hide_footer_px,
         "openaip_api_key": settings.openaip_api_key,
         "metar_source": settings.metar_source,
     }

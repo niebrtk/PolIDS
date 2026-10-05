@@ -44,14 +44,38 @@ def test_meteo_and_qnh(client):
     assert m[1]["parsed"]["station"] == "EPKK"
     q = client.get("/api/meteo/qnh-regions").json()
     assert all(r["qnh"] == 1012 for r in q["regions"])
+    assert len(q["regions"]) == 17 and q["regions"][0]["geometry"]["type"] in ("Polygon", "MultiPolygon")
 
 
 def test_aircraft_and_callsigns(client):
     a = client.get("/api/aircraft?q=B738").json()
     assert a and a[0]["recat"] == "D" and a[0]["wingspan"] > 30
     assert client.get("/api/callsigns?q=LOT").json()[0]["icao"] == "LOT"
+    mil = client.get("/api/callsigns?category=MIL&q=PLF").json()
+    assert mil and mil[0]["category"] == "MIL"
 
 
 def test_route_without_navdata(client):
     r = client.get("/api/nav/route?route=EPWA DCT EPKK").json()
     assert [p["ident"] for p in r["points"]] == ["EPWA", "EPKK"] and 120 < r["distance_nm"] < 140
+
+
+def test_docs_read_only(client):
+    assert client.get("/api/docs").status_code == 200
+    assert client.post("/api/docs").status_code == 405
+
+
+def test_vatsim_endpoints(client):
+    from backend.app.routers import vatsim
+
+    async def feed():
+        return {"general": {}, "controllers": [{"callsign": "EPWA_APP", "frequency": "128.805", "name": "Jan", "cid": 1}],
+                "atis": [], "pilots": [{"callsign": "LOT1", "latitude": 52.1, "longitude": 20.9, "heading": 90,
+                                        "flight_plan": {"departure": "EPWA", "arrival": "EPKK", "route": "DCT"}}]}
+    vatsim.get_feed = feed
+    on = client.get("/api/vatsim/online").json()
+    assert on["positions"]["EPWA_APP"]["name"] == "Jan"
+    assert client.get("/api/vatsim/pilots?bbox=50,15,55,25").json()[0]["callsign"] == "LOT1"
+    r = client.get("/api/vatsim/pilots/LOT1/route").json()
+    assert [p["ident"] for p in r["points"]] == ["EPWA", "EPKK"]
+    assert any(f["properties"]["id"] == "EPWW" for f in client.get("/api/vatsim/firs").json()["features"])

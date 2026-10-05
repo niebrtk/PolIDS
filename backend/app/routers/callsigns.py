@@ -9,8 +9,10 @@ router = APIRouter(prefix="/api/callsigns", tags=["callsign"])
 
 
 @router.get("")
-def search(q: str = "", prefix: str = "", limit: int = 200, db: Session = Depends(get_db)):
+def search(q: str = "", prefix: str = "", category: str = "", limit: int = 200, db: Session = Depends(get_db)):
     stmt = select(Callsign)
+    if category:
+        stmt = stmt.where(Callsign.category == category.upper())
     if prefix:
         stmt = stmt.where(Callsign.icao.startswith(prefix.upper()))
     if q:
@@ -21,5 +23,5 @@ def search(q: str = "", prefix: str = "", limit: int = 200, db: Session = Depend
         stmt = stmt.order_by(case((Callsign.icao == q.upper(), 0), else_=1), Callsign.icao)
     else:
         stmt = stmt.order_by(Callsign.icao)
-    return [{"icao": c.icao, "name": c.name, "telephony": c.telephony, "country": c.country, "source": c.source}
+    return [{"icao": c.icao, "name": c.name, "telephony": c.telephony, "country": c.country, "category": c.category}
             for c in db.scalars(stmt.limit(min(limit, 2000)))]

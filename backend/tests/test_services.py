@@ -5,7 +5,13 @@ from backend.app.importers.navdata import parse_airways
 from backend.app.importers.sct import parse_coord, parse_sct
 from backend.app.services.airac import current_airac
 from backend.app.services.metar import parse_metar, qfe_from_qnh
-from backend.app.services.notam import split_notams
+from datetime import datetime, timedelta, timezone
+from types import SimpleNamespace
+
+from backend.app.importers.callsigns import parse_gr_operator_info
+from backend.app.services.lvp import evaluate as evaluate_lvp
+from backend.app.services.notam import for_aerodrome, split_notams
+from backend.app.services.vatsim import bookings_by_callsign, match_positions, online_firs
 from backend.app.services.runways import suggest_runway, wind_components
 
 
@@ -95,3 +101,42 @@ def test_notam_split():
     n = split_notams(text)
     assert [x["id"] for x in n] == ["A1234/26", "A1235/26"]
     assert n[0]["fields"]["E"] == "RWY 11/29 CLSD"
+
+
+def test_notam_only_for_aerodrome():
+    text = "(A1234/26 NOTAMN\nA) EPWA B) 2610050600 C) PERM\nE) RWY 11/29 CLSD)\n" \
+           "(A1250/26 NOTAMN\nA) EPKK B) 2610050600 C) PERM\nE) RWY 07/25 CLSD)\n" \
+           "(A1260/26 NOTAMN\nA) EPWA EPMO B) 2610050600 C) PERM\nE) NAV WARNING)"
+    assert [n["id"] for n in for_aerodrome(split_notams(text), "EPWA")] == ["A1234/26", "A1260/26"]
+
+
+def test_lvp():
+    assert evaluate_lvp(parse_metar("EPWA 051630Z 31004KT 0400 R29/0350N FG VV002 08/08 Q1009"), "EPWA")["state"] == "LVP"
+    prep = evaluate_lvp(parse_metar("EPWA 051630Z 31004KT 0700 BR OVC006 08/08 Q1009"), "EPWA")
+    assert prep["state"] == "PREP" and "widzialność 700 m" in prep["reasons"][0]
+    assert evaluate_lvp(parse_metar("EPWA 051630Z 31004KT CAVOK 08/02 Q1009"), "EPWA")["state"] is None
+
+
+def _pos(cs, freq, prefix):
+    return SimpleNamespace(callsign=cs, frequency=freq, prefix=prefix, position_id=cs)
+
+
+def test_vatsim_matching_and_bookings():
+    positions = [_pos("EPWA_APP", "128.805", "EPWA"), _pos("EPWW_C_CTR", "133.475", "EPWW")]
+    ctrls = [{"callsign": "EPWA_APP", "frequency": "128.805", "name": "Jan", "cid": 1},
+             {"callsign": "EPWW_C1_CTR", "frequency": "133.475", "name": "Anna", "cid": 2},
+             {"callsign": "EDWW_FLG_CTR", "frequency": "136.450", "name": "Max", "cid": 3}]
+    online = match_positions(ctrls, positions)
+    assert online["EPWA_APP"]["name"] == "Jan" and online["EPWW_C_CTR"]["callsign"] == "EPWW_C1_CTR"
+    assert "EDWW-FLG" in online_firs(ctrls)
+    now = datetime(2026, 10, 5, 18, 0, tzinfo=timezone.utc)
+    fmt = lambda d: d.strftime("%Y-%m-%d %H:%M:%S")  # noqa: E731
+    books = [{"cid": 5, "callsign": "EPWA_TWR", "start": fmt(now + timedelta(hours=1)), "end": fmt(now + timedelta(hours=2))},
+             {"cid": 6, "callsign": "EPWA_GND", "start": fmt(now - timedelta(hours=3)), "end": fmt(now - timedelta(hours=1))},
+             {"cid": 7, "callsign": "EDDB_TWR", "start": fmt(now), "end": fmt(now + timedelta(hours=1))}]
+    out = bookings_by_callsign(books, "EP", now=now)
+    assert list(out) == ["EPWA_TWR"] and out["EPWA_TWR"][0]["active"] is False
+
+
+def test_gr_operator_info():
+    assert parse_gr_operator_info("DHK\tC\nPLF\tMil\nXXX\t?\n") == {"DHK": "CARGO", "PLF": "MIL"}

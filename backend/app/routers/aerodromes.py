@@ -8,6 +8,7 @@ from ..config import settings
 from ..database import get_db
 from ..models import Aerodrome, AtcPosition
 from ..services.http_cache import UpstreamError
+from ..services.lvp import evaluate as evaluate_lvp
 from ..services.metar import parse_metar, qfe_from_qnh
 from ..services.runways import runway_heading, suggest_runway, wind_components
 from ..services.weather import get_metars, get_tafs
@@ -75,7 +76,7 @@ async def status(icao: str, db: Session = Depends(get_db)):
     return {
         "icao": ad.icao, "name": ad.name, "elevation_ft": ad.elevation_ft,
         "metar": metar, "parsed": parsed.to_dict() if parsed else None, "taf": taf,
-        "qfe": qfe, "runways": rwys,
+        "qfe": qfe, "runways": rwys, "lvp": evaluate_lvp(parsed, ad.icao),
         "suggested_runway": best["designator"] if best else None, "suggestion_reason": reason,
         "errors": errors,
     }

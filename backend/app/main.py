@@ -7,7 +7,7 @@ from fastapi.staticfiles import StaticFiles
 
 from .config import settings
 from .importers.seed import init_db
-from .routers import aerodromes, aircraft, callsigns, docs, meteo, nav, notam, system
+from .routers import aerodromes, aircraft, callsigns, docs, meteo, nav, notam, system, vatsim
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
 
@@ -18,14 +18,16 @@ async def lifespan(_app: FastAPI):
     yield
 
 
-app = FastAPI(title="vPANDORA API", version="0.1.0", lifespan=lifespan,
+app = FastAPI(title="vPANDORA API", version="0.3.0", lifespan=lifespan,
               description="API dla aplikacji vPANDORA (VATSIM PL vACC). Dokumentacja interaktywna: /docs")
 
-for r in (system, meteo, aerodromes, notam, aircraft, callsigns, nav, docs):
+for r in (system, meteo, aerodromes, notam, aircraft, callsigns, nav, vatsim, docs):
     app.include_router(r.router)
 
 settings.docs_dir.mkdir(parents=True, exist_ok=True)
+settings.photos_dir.mkdir(parents=True, exist_ok=True)
 app.mount("/files/docs", StaticFiles(directory=settings.docs_dir), name="docs-files")
+app.mount("/files/photos", StaticFiles(directory=settings.photos_dir), name="photo-files")
 app.mount("/static", StaticFiles(directory=settings.frontend_dir), name="static")
 
 

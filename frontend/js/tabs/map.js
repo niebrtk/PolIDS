@@ -1,11 +1,5 @@
-import { BASEMAPS, api, esc, h } from "../api.js";
-
-const PALETTE = ["#2f8fff", "#3ecf6e", "#ffb020", "#ff5c8a", "#a970ff", "#00c2c7", "#ff7a3d", "#c3d82b", "#ff4dd2", "#6f8cff"];
-function colorFor(key) {
-  let x = 0;
-  for (const ch of String(key)) x = (x * 31 + ch.charCodeAt(0)) >>> 0;
-  return PALETTE[x % PALETTE.length];
-}
+import { BASEMAPS, api, atcPositions, esc, h, hhmm, vatsimOnline } from "../api.js";
+import { aircraftMarker, drawFirs, drawSectors, fl, loadFirs, sectorOwners } from "../airspace.js";
 
 export default {
   mount(root, ctx) {
@@ -18,8 +12,14 @@ export default {
         <h4>SEKTORYZACJA</h4>
         <label>Poziom FL <input type="number" class="field fl" value="300" min="0" max="660" step="5" style="width:80px"></label>
         <label><input type="checkbox" class="sectors" checked> sektory EPWW</label>
-        <label><input type="checkbox" class="online"> aktualna (VATSIM online)</label>
+        <label><input type="checkbox" class="online" checked> aktualna (kto jest online)</label>
+        <label><input type="checkbox" class="firs" checked> FIR-y sąsiednie (VATSpy)</label>
         <div class="sector-info hint"></div>
+        <h4>RUCH (VATSIM)</h4>
+        <label><input type="checkbox" class="traffic" checked> samoloty</label>
+        <label><input type="checkbox" class="traffic-detail"> etykiety z FL, typem i prędkością</label>
+        <div class="traffic-info hint"></div>
+        <div class="flight card" style="display:none;margin-top:6px"></div>
         <h4>WARSTWY</h4>
         <label><input type="checkbox" class="airways"> drogi lotnicze (przybliż mapę)</label>
         <label><input type="checkbox" class="navaids" checked> VOR / NDB</label>
@@ -41,7 +41,9 @@ export default {
     const layers = {
       sectors: L.layerGroup().addTo(map), airways: L.layerGroup(), navaids: L.layerGroup().addTo(map),
       fixes: L.layerGroup(), ads: L.layerGroup().addTo(map), route: L.layerGroup().addTo(map),
+      firs: L.layerGroup().addTo(map), traffic: L.layerGroup().addTo(map), flight: L.layerGroup().addTo(map),
     };
+    layers.firs.setZIndex?.(0);
     let openaip = null;
 
     pane.querySelectorAll("input[name=base]").forEach((r) => r.addEventListener("change", () => {
@@ -68,34 +70,83 @@ export default {
         .bindTooltip(`${a.icao} ${esc(a.name)}`).on("click", () => ctx.open("aerodrome", a.icao)).addTo(layers.ads);
     }));
 
-    // --- sektory
-    let online = null;
+    // --- sektory EPWW i FIR-y sąsiednie, podświetlone wg zalogowanych kontrolerów
     const loadSectors = async () => {
+      const level = parseInt($(".fl").value || "0", 10);
+      const wantOnline = $(".online").checked;
+      const [gj, firs, net, positions] = await Promise.all([
+        $(".sectors").checked ? api(`/api/nav/sectors?fir=EPWW&level_ft=${level * 100}`) : null,
+        $(".firs").checked ? loadFirs().catch(() => null) : null,
+        wantOnline || $(".firs").checked ? vatsimOnline().catch((e) => ({ error: e.message })) : null,
+        atcPositions(),
+      ]);
       layers.sectors.clearLayers();
-      if (!$(".sectors").checked) return;
-      const fl = parseInt($(".fl").value || "0", 10);
-      const gj = await api(`/api/nav/sectors?fir=EPWW&level_ft=${fl * 100}`);
-      if ($(".online").checked) {
-        try {
-          online = await api("/api/nav/sectors/online?fir=EPWW");
-          $(".sector-info").textContent = `Online: ${online.online_positions.map((p) => p.callsign).join(", ") || "brak kontrolerów EPWW"}`;
-        } catch (e) { online = null; $(".sector-info").textContent = e.message; }
-      } else { online = null; $(".sector-info").textContent = `${gj.features.length} sektorów na FL${fl} (podział pełny)`; }
-      gj.features.forEach((f) => {
-        const pr = f.properties;
-        const own = online ? online.sector_owner[pr.name] : null;
-        const label = online ? (own ? `${own.callsign} ${own.frequency}` : "UNICOM 122.800") : `${pr.callsign || ""} ${pr.frequency || ""}`;
-        const color = online ? (own ? colorFor(own.callsign) : "#555") : colorFor(pr.callsign || pr.name);
-        const poly = L.geoJSON(f, { style: { color, weight: 1.5, fillColor: color, fillOpacity: 0.18 } })
-          .bindTooltip(`<b>${esc(pr.name)}</b><br>FL${String(Math.round((pr.lower_ft || 0) / 100)).padStart(3, "0")}–FL${String(Math.round((pr.upper_ft || 0) / 100)).padStart(3, "0")}<br>${esc(label)}`, { sticky: true });
-        poly.addTo(layers.sectors);
-        L.tooltip({ permanent: true, direction: "center", className: "lbl" }).setLatLng(poly.getBounds().getCenter())
-          .setContent(`${esc(pr.name)}<br>${esc(label)}`).addTo(layers.sectors);
+      layers.firs.clearLayers();
+      if (firs) drawFirs(layers.firs, firs, net?.firs || {});
+      if (!gj) { $(".sector-info").textContent = ""; return; }
+      const online = wantOnline && net && !net.error ? sectorOwners(gj, positions, net.positions) : null;
+      drawSectors(layers.sectors, gj, online);
+      $(".sector-info").innerHTML = net?.error ? `<span class="error">${esc(net.error)}</span>`
+        : online ? `Online: ${Object.values(net.positions).filter((c) => c.callsign.startsWith("EPWW")).map((c) => esc(c.callsign)).join(", ") || "brak kontrolerów EPWW"}`
+          : `${gj.features.length} sektorów na ${fl(level * 100)} (podział pełny)`;
+    };
+    ["sectors", "online", "firs"].forEach((c) => $("." + c).addEventListener("change", loadSectors));
+    $(".fl").addEventListener("change", loadSectors);
+    setInterval(() => document.body.contains(pane) && loadSectors(), 60000);
+
+    // --- samoloty z VATSIM; kliknięcie pokazuje plan lotu i trasę
+    let selected = null;
+    const showFlight = async (cs) => {
+      selected = cs;
+      layers.flight.clearLayers();
+      const box = $(".flight");
+      box.style.display = "";
+      box.innerHTML = `<span class="hint">Ładowanie planu lotu ${esc(cs)}…</span>`;
+      try {
+        const f = await api(`/api/vatsim/pilots/${encodeURIComponent(cs)}/route`);
+        if (selected !== cs) return;
+        if (f.points.length) {
+          const line = L.polyline(f.points.map((p) => [p.lat, p.lon]), { color: "#ffb020", weight: 2, dashArray: "6 4" }).addTo(layers.flight);
+          f.points.forEach((p) => L.circleMarker([p.lat, p.lon], { radius: 3, color: "#ffb020", fillOpacity: 1 })
+            .bindTooltip(p.ident, { permanent: map.getZoom() >= 7, direction: "top", className: "lbl" }).addTo(layers.flight));
+          map.fitBounds(line.getBounds(), { padding: [40, 40], maxZoom: 9 });
+        }
+        box.innerHTML = `<b class="mono" style="font-size:16px">${esc(f.callsign)}</b> <span class="hint">${esc(f.name || "")} (${esc(f.cid)})</span>
+          <button class="btn close-flight" style="float:right;padding:0 6px">✕</button><br>
+          <span class="mono">${esc(f.aircraft || "–")} · ${esc(f.departure || "?")} → ${esc(f.arrival || "?")} · RFL ${esc(f.rfl || "–")}</span><br>
+          <span class="mono">${fl(f.altitude)} · GS ${esc(f.groundspeed)} kt · SQ ${esc(f.squawk || "–")} · ${f.rules === "V" ? "VFR" : "IFR"}</span>
+          <div class="mono hint" style="margin-top:4px">${esc(f.route || "brak trasy")}</div>
+          ${f.points.length ? `<div class="hint">${f.points.length} punktów · ${f.distance_nm} NM</div>` : ""}
+          ${f.warnings.length ? `<div class="hint" style="color:var(--warn)">${f.warnings.map(esc).join("<br>")}</div>` : ""}`;
+      } catch (e) { box.innerHTML = `<span class="error">${esc(e.message)}</span> <button class="btn close-flight">✕</button>`; }
+    };
+    $(".flight").addEventListener("click", (e) => {
+      if (!e.target.closest(".close-flight")) return;
+      selected = null; layers.flight.clearLayers(); $(".flight").style.display = "none";
+    });
+    let pilots = [];
+    const drawTraffic = () => {
+      layers.traffic.clearLayers();
+      if (!$(".traffic").checked) return;
+      const z = map.getZoom(), b = map.getBounds().pad(0.2);
+      pilots.filter((p) => b.contains([p.lat, p.lon])).forEach((p) => {
+        aircraftMarker(p, { label: z >= 6, detail: $(".traffic-detail").checked || z >= 9 })
+          .bindTooltip(`${esc(p.callsign)} ${esc(p.aircraft || "")} ${esc(p.departure || "")}→${esc(p.arrival || "")} ${fl(p.altitude)}`)
+          .on("click", () => showFlight(p.callsign)).addTo(layers.traffic);
       });
     };
-    ["sectors", "online"].forEach((c) => $("." + c).addEventListener("change", loadSectors));
-    $(".fl").addEventListener("change", loadSectors);
-    setInterval(() => $(".online").checked && document.body.contains(pane) && loadSectors(), 60000);
+    const loadTraffic = async () => {
+      if (!$(".traffic").checked) { layers.traffic.clearLayers(); $(".traffic-info").textContent = ""; return; }
+      try {
+        pilots = await api("/api/vatsim/pilots?bbox=44,5,60,35");
+        $(".traffic-info").textContent = `${pilots.length} samolotów w Europie Środkowej · ${hhmm(new Date().toISOString())}. Kliknij samolot, żeby zobaczyć trasę.`;
+      } catch (e) { pilots = []; $(".traffic-info").innerHTML = `<span class="error">${esc(e.message)}</span>`; }
+      drawTraffic();
+    };
+    $(".traffic").addEventListener("change", loadTraffic);
+    $(".traffic-detail").addEventListener("change", drawTraffic);
+    map.on("moveend", drawTraffic);
+    setInterval(() => document.body.contains(pane) && $(".traffic").checked && loadTraffic(), 30000);
 
     // --- punkty i drogi w widocznym obszarze
     const bbox = () => { const b = map.getBounds(); return [b.getSouth(), b.getWest(), b.getNorth(), b.getEast()].map((x) => x.toFixed(3)).join(","); };
@@ -154,6 +205,7 @@ export default {
     $(".clear-route").addEventListener("click", () => { layers.route.clearLayers(); $(".route-info").textContent = ""; });
 
     loadSectors();
+    loadTraffic();
     return { activate: () => setTimeout(() => { map.invalidateSize(); loadVisible(); }, 50) };
   },
 };

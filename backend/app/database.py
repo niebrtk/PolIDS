@@ -4,6 +4,10 @@ from sqlalchemy.orm import DeclarativeBase, sessionmaker
 from .config import settings
 
 
+# Podnieś przy każdej zmianie tabel: stara baza zostanie zbudowana od nowa z plików w repo.
+SCHEMA_VERSION = 2
+
+
 class Base(DeclarativeBase):
     pass
 

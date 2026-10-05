@@ -34,7 +34,24 @@ def split_notams(text: str) -> list[dict]:
     return out
 
 
+def for_aerodrome(notams: list[dict], icao: str) -> list[dict]:
+    """Tylko NOTAM-y, których pole A) wymienia dane lotnisko (serwer zwraca też NOTAM-y innych lotnisk i FIR).
+    NOTAM bez pola A) zostaje tylko wtedy, gdy w jego treści pada kod lotniska."""
+    icao = icao.upper()
+    out = []
+    for n in notams:
+        a = n["fields"].get("A")
+        if a is not None:
+            if icao in re.findall(r"[A-Z]{4}", a):
+                out.append(n)
+        elif re.search(rf"\b{icao}\b", n["raw"]):
+            out.append(n)
+    return out
+
+
 async def get_notams(icao: str) -> dict:
     url = notam_url(icao)
     text = await fetch_text(url, settings.notam_cache_seconds)
-    return {"icao": icao.upper(), "source": url, "notams": split_notams(text)}
+    allnotams = split_notams(text)
+    notams = for_aerodrome(allnotams, icao)
+    return {"icao": icao.upper(), "source": url, "notams": notams, "other": len(allnotams) - len(notams)}

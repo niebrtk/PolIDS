@@ -16,10 +16,10 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from ..config import DATA_DIR, settings
-from ..database import Base, SessionLocal, engine
+from ..database import SCHEMA_VERSION, Base, SessionLocal, engine
 from ..models import AircraftType, Aerodrome, Callsign, Document, Frequency, ImportLog, NavPoint, Runway
 from .aircraft_json import import_aircraft_json
-from .callsigns import import_icao_airlines
+from .callsigns import import_gr_operator_info, import_icao_airlines
 from .ese import import_ese
 from .navdata import import_airways, import_icao_airports, import_isec
 from .sct import import_sct
@@ -36,6 +36,7 @@ IMPORTERS = [
     (".sct2", import_sct),
     (".ese", import_ese),
     ("icao_airlines.txt", import_icao_airlines),
+    ("grpluginoperatorinfo.txt", import_gr_operator_info),
     ("icao_aircraft.json", import_aircraft_json),
 ]
 
@@ -152,7 +153,21 @@ def import_user_files(db: Session, force: bool = False) -> list[dict]:
     return results
 
 
+def _check_schema():
+    """Baza ze starszej wersji aplikacji (inne kolumny) jest usuwana i budowana od nowa."""
+    with engine.connect() as conn:
+        version = conn.exec_driver_sql("PRAGMA user_version").scalar() if engine.dialect.name == "sqlite" else None
+    if version is not None and version != SCHEMA_VERSION:
+        if version:
+            log.info("Zmiana struktury bazy (%s -> %s): przebudowa bazy", version, SCHEMA_VERSION)
+        Base.metadata.drop_all(engine)
+        Base.metadata.create_all(engine)
+        with engine.begin() as conn:
+            conn.exec_driver_sql(f"PRAGMA user_version = {SCHEMA_VERSION}")
+
+
 def init_db(force: bool = False) -> list[dict]:
+    _check_schema()
     Base.metadata.create_all(engine)
     with SessionLocal() as db:
         if force:
