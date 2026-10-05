@@ -4,7 +4,9 @@ samoloty w powietrzu i granice FIR z projektu VATSpy.
 Dokumentacja API: https://vatsim.dev/services/apis"""
 
 import json
-from datetime import datetime, timezone
+import math
+import re
+from datetime import datetime, timedelta, timezone
 from functools import lru_cache
 
 from ..config import settings
@@ -50,7 +52,7 @@ def parse_time(v: str | None) -> datetime | None:
 def controller_info(c: dict) -> dict:
     return {"callsign": c.get("callsign", ""), "frequency": c.get("frequency", ""), "name": c.get("name"),
             "cid": c.get("cid"), "rating": c.get("rating"), "logon_time": c.get("logon_time"),
-            "text_atis": c.get("text_atis")}
+            "text_atis": c.get("text_atis"), "atis_code": c.get("atis_code")}
 
 
 def match_positions(controllers: list[dict], positions: list) -> dict[str, dict]:
@@ -72,16 +74,20 @@ def match_positions(controllers: list[dict], positions: list) -> dict[str, dict]
     return online
 
 
+def end_of_utc_day(now: datetime) -> datetime:
+    return datetime(now.year, now.month, now.day, tzinfo=timezone.utc) + timedelta(days=1)
+
+
 def bookings_by_callsign(bookings: list[dict], prefix: str = "", now: datetime | None = None,
-                         hours_ahead: int = 24) -> dict[str, list[dict]]:
-    """Rezerwacje trwające teraz albo zaczynające się w ciągu `hours_ahead` godzin, wg callsigna."""
+                         until: datetime | None = None) -> dict[str, list[dict]]:
+    """Rezerwacje trwające teraz albo zaczynające się przed `until` (domyślnie: do końca bieżącej doby UTC)."""
     now = now or datetime.now(timezone.utc)
+    until = until or end_of_utc_day(now)
     out: dict[str, list[dict]] = {}
     for b in bookings:
         cs = (b.get("callsign") or "").upper()
         start, end = parse_time(b.get("start")), parse_time(b.get("end"))
-        if not cs.startswith(prefix.upper()) or not start or not end or end < now \
-                or (start - now).total_seconds() > hours_ahead * 3600:
+        if not cs.startswith(prefix.upper()) or not start or not end or end < now or start >= until:
             continue
         out.setdefault(cs, []).append({"callsign": cs, "cid": b.get("cid"), "type": b.get("type"),
                                         "start": start.isoformat(), "end": end.isoformat(),
@@ -127,3 +133,80 @@ def pilot_info(p: dict) -> dict:
             "groundspeed": p.get("groundspeed"), "heading": p.get("heading"), "squawk": p.get("transponder"),
             "aircraft": fp.get("aircraft_short"), "departure": fp.get("departure"), "arrival": fp.get("arrival"),
             "route": fp.get("route"), "rfl": fp.get("altitude"), "rules": fp.get("flight_rules")}
+
+
+RWY = r"(\d{2}[LRC]?)"
+_ATIS_PATTERNS = [  # (wzorzec, do czego się odnosi)
+    (rf"\b{RWY} FOR (?:LANDING|ARRIVALS?)", "arr"),
+    (rf"\b{RWY} FOR (?:TAKE ?-?OFF|DEPARTURES?)", "dep"),
+    (rf"\b(?:ARR(?:IVAL)?S?|LANDING|LDG)(?: RWY| RUNWAY)?(?: IN USE)?:? {RWY}\b", "arr"),
+    (rf"\b(?:DEP(?:ARTURE)?S?|TAKE ?-?OFF|TKOF)(?: RWY| RUNWAY)?(?: IN USE)?:? {RWY}\b", "dep"),
+    (rf"\b(?:RWY|RUNWAY)S? (?:IN USE )?{RWY} IN USE\b", "both"),
+    (rf"\b(?:RWY|RUNWAY)S? IN USE:? {RWY}\b", "both"),
+]
+_ATIS_FALLBACK = rf"\b(?:RWY|RUNWAY) {RWY}\b"  # tylko gdy nic konkretniejszego nie pasuje
+
+
+def parse_atis(lines: list[str] | None, designators: list[str] | None = None, code: str | None = None) -> dict:
+    """Litera ATIS i pas(y) w użyciu z tekstu ATIS z sieci VATSIM.
+
+    Działa z typowymi formatami vATIS: "RWY 29 IN USE", "RUNWAY IN USE 33", "33 FOR LANDING, 29 FOR TAKEOFF",
+    "ARR RWY 33 DEP RWY 29". Pas musi istnieć na lotnisku (jeśli podano listę `designators`)."""
+    text = re.sub(r"\s+", " ", " ".join(lines or [])).upper()
+    letter = code or None
+    if not letter:
+        m = re.search(r"\b(?:INFORMATION|INFO|ATIS) ([A-Z])\b", text)
+        letter = m.group(1) if m else None
+    ok = lambda r: not designators or r in designators  # noqa: E731
+    arr = dep = None
+    for pattern, kind in _ATIS_PATTERNS:
+        for m in re.finditer(pattern, text):
+            rwy = m.group(1)
+            if not ok(rwy):
+                continue
+            if kind in ("arr", "both") and not arr:
+                arr = rwy
+            if kind in ("dep", "both") and not dep:
+                dep = rwy
+    if not arr and not dep:
+        arr = next((m.group(1) for m in re.finditer(_ATIS_FALLBACK, text) if ok(m.group(1))), None)
+    return {"letter": letter, "arr": arr or dep, "dep": dep or arr, "text": text}
+
+
+def distance_nm(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    p1, p2 = math.radians(lat1), math.radians(lat2)
+    dl = math.radians(lon2 - lon1)
+    a = math.sin((p2 - p1) / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dl / 2) ** 2
+    return 3440.065 * 2 * math.asin(math.sqrt(a))
+
+
+def airport_traffic(feed: dict, icao: str, lat: float | None = None, lon: float | None = None) -> dict:
+    """Loty z planem do/z lotniska: odloty, przyloty i plany złożone przed połączeniem (prefile)."""
+    icao = icao.upper()
+    out = {"departures": [], "arrivals": [], "prefiles": []}
+    for p in feed.get("pilots", []):
+        fp = p.get("flight_plan") or {}
+        dep, arr = fp.get("departure"), fp.get("arrival")
+        if icao not in (dep, arr):
+            continue
+        info = pilot_info(p)
+        info["dist_nm"] = (round(distance_nm(lat, lon, info["lat"], info["lon"]))
+                           if lat is not None and info["lat"] is not None else None)
+        gs = info["groundspeed"] or 0
+        info["state"] = "ground" if gs < 50 else "air"
+        if arr == icao and dep != icao:
+            info["eta_min"] = round(info["dist_nm"] / gs * 60) if info["dist_nm"] is not None and gs >= 50 else None
+            out["arrivals"].append(info)
+        else:
+            out["departures"].append(info)
+    for p in feed.get("prefiles", []):
+        fp = p.get("flight_plan") or {}
+        if icao in (fp.get("departure"), fp.get("arrival")):
+            out["prefiles"].append({"callsign": p.get("callsign"), "name": p.get("name"), "cid": p.get("cid"),
+                                    "aircraft": fp.get("aircraft_short"), "departure": fp.get("departure"),
+                                    "arrival": fp.get("arrival"), "deptime": fp.get("deptime"),
+                                    "rfl": fp.get("altitude"), "rules": fp.get("flight_rules")})
+    out["arrivals"].sort(key=lambda x: (x["dist_nm"] is None, x["dist_nm"] or 0))
+    out["departures"].sort(key=lambda x: (x["state"] != "ground", x["dist_nm"] or 0))
+    out["prefiles"].sort(key=lambda x: x.get("deptime") or "")
+    return out

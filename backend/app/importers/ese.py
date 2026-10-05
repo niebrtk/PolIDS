@@ -120,3 +120,25 @@ def import_ese(db: Session, path: Path) -> dict:
         db.execute(insert(Sector), data["sectors"])
     db.commit()
     return {"positions": len(data["positions"]), "sectors": len(data["sectors"])}
+
+
+def parse_vfr_points(text: str) -> list[dict]:
+    """Punkty VFR z sekcji [FREETEXT] (grupy "EPWA VFR", "EPKK VFR"…): N052.03.47.000:E020.44.35.000:EPBC VFR:A"""
+    out, in_ft = [], False
+    for line in text.splitlines():
+        line = line.strip()
+        if line.startswith("["):
+            in_ft = line.upper() == "[FREETEXT]"
+            continue
+        if not in_ft or not line or line.startswith(";"):
+            continue
+        parts = line.split(":")
+        if len(parts) < 4 or not parts[2].upper().endswith(" VFR"):
+            continue
+        lat, lon = parse_coord(parts[0]), parse_coord(parts[1])
+        if lat is None or lon is None:
+            continue
+        ad = parts[2].split()[0].upper()
+        out.append({"ident": parts[3].strip(), "kind": "VFR", "name": f"{ad} VFR", "frequency": None,
+                    "lat": lat, "lon": lon})
+    return out

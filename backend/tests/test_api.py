@@ -22,6 +22,13 @@ def client():
 
     for mod in (aerodromes, meteo):
         mod.get_metars, mod.get_tafs = fake_metars, fake_tafs
+
+    async def fake_feed():
+        return {"general": {}, "controllers": [{"callsign": "EPWA_TWR", "frequency": "118.305", "name": "Ola", "cid": 3}],
+                "atis": [{"callsign": "EPWA_ATIS", "frequency": "120.455", "atis_code": "B",
+                          "text_atis": ["WARSAW CHOPIN INFORMATION B", "RWY 33 FOR LANDING 29 FOR TAKEOFF"]}],
+                "pilots": [], "prefiles": []}
+    aerodromes.get_feed = fake_feed
     with TestClient(main.app) as c:
         yield c
 
@@ -30,12 +37,20 @@ def test_frontend_and_config(client):
     assert "vPANDORA" in client.get("/").text
     cfg = client.get("/api/config").json()
     assert cfg["links"]["inop"].startswith("https://om.plvacc.pl")
+    assert "learningzone.eurocontrol.int" in cfg["links"]["phraseology"] and "carto_api_key" in cfg
+    assert "inop_hide_footer_px" not in cfg
 
 
 def test_aerodrome_status(client):
     st = client.get("/api/aerodromes/EPWA/status").json()
     assert st["parsed"]["qnh"] == 1012
-    assert st["suggested_runway"] == "29"
+    assert st["suggested_runway"] == "29" and st["preferred"]["arr"] == "29"
+    # kontrola online z ATIS: pas w użyciu z ATIS, litera B
+    assert st["runway_in_use"] == {"arr": "33", "dep": "29", "source": "ATIS", "reason": "Z ATIS B"}
+    assert st["atis"]["letter"] == "B" and st["atc_online"][0]["callsign"] == "EPWA_TWR"
+    assert "ILS" in next(r for r in st["runways"] if r["designator"] == "33")["equipment"]
+    chk = client.get("/api/aerodromes/EPWA/checklist").json()
+    assert chk["id"] == "open-position" and chk["items"]
     assert client.get("/api/aerodromes/XXXX/status").status_code == 404
 
 
@@ -60,6 +75,13 @@ def test_route_without_navdata(client):
     assert [p["ident"] for p in r["points"]] == ["EPWA", "EPKK"] and 120 < r["distance_nm"] < 140
 
 
+def test_checklists_and_emergency(client):
+    ids = [c["id"] for c in client.get("/api/checklists").json()["checklists"]]
+    assert ids == ["open-position", "close-position", "handover-takeover", "rwy-change"]
+    procs = client.get("/api/emergency").json()["procedures"]
+    assert len(procs) == 18 and procs[1]["id"] == "A06" and any(p["id"] == "RCF" for p in procs)
+
+
 def test_docs_read_only(client):
     assert client.get("/api/docs").status_code == 200
     assert client.post("/api/docs").status_code == 405
@@ -79,3 +101,5 @@ def test_vatsim_endpoints(client):
     r = client.get("/api/vatsim/pilots/LOT1/route").json()
     assert [p["ident"] for p in r["points"]] == ["EPWA", "EPKK"]
     assert any(f["properties"]["id"] == "EPWW" for f in client.get("/api/vatsim/firs").json()["features"])
+    ad = client.get("/api/vatsim/airport/EPWA").json()
+    assert [p["callsign"] for p in ad["departures"]] == ["LOT1"] and ad["arrivals"] == []

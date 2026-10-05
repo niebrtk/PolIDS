@@ -1,4 +1,5 @@
 import { api, esc, fmt, h, hhmm, positionTip, vatsimBookings, vatsimOnline } from "../api.js";
+import { renderChecklist } from "../checklist.js";
 import { colorize, wxLines } from "./meteo.js";
 
 const TYPE_ORDER = ["CTR", "FSS", "APP", "DEP", "TWR", "GND", "DEL", "ATIS"];
@@ -23,38 +24,132 @@ function lvpBox(lvp) {
   return `<div class="lvp lvp-${lvp.state.toLowerCase()}" data-tip="${esc(rule)}">${label}<span>${lvp.reasons.map(esc).join("<br>")}</span></div>`;
 }
 
-// Róża wiatrów: pasy jako prostokąty, strzałka wiatru skąd wieje.
+// Róża wiatrów: pasy jako prostokąty, strzałka wiatru skąd wieje. Kierunek pasa w użyciu / preferowany
+// zaznaczony kolorem, szewronami w kierunku lądowania/startu i podświetlonym oznaczeniem przy progu.
+const USE_COLOR = { arr: "#5fd23a", dep: "#3ec7e0" };
 function windrose(status) {
   const p = status.parsed || {};
-  const size = 260, c = size / 2, r = 105;
-  const seen = new Set();
-  const rwys = status.runways.filter((x) => {
+  const use = status.runway_in_use || {};
+  const size = 280, c = size / 2, r = 112;
+  const pt = (deg, d) => [c + Math.sin(deg * Math.PI / 180) * d, c - Math.cos(deg * Math.PI / 180) * d];
+  const pairs = [];
+  status.runways.forEach((x) => {
     const key = Math.round((x.heading % 180) / 5);
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
+    let g = pairs.find((q) => q.key === key);
+    if (!g) pairs.push(g = { key, ends: [] });
+    if (!g.ends.some((e) => e.designator === x.designator)) g.ends.push(x);
   });
   const ticks = Array.from({ length: 36 }, (_, i) => {
-    const a = (i * 10 - 90) * Math.PI / 180, l = i % 9 === 0 ? 12 : 6;
-    return `<line x1="${c + Math.cos(a) * r}" y1="${c + Math.sin(a) * r}" x2="${c + Math.cos(a) * (r - l)}" y2="${c + Math.sin(a) * (r - l)}" stroke="#9aa4af"/>`;
+    const [x1, y1] = pt(i * 10, r), [x2, y2] = pt(i * 10, r - (i % 9 === 0 ? 12 : 6));
+    return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#9aa4af"/>`;
   }).join("");
   const labels = ["N", "E", "S", "W"].map((t, i) => {
-    const a = (i * 90 - 90) * Math.PI / 180;
-    return `<text x="${c + Math.cos(a) * (r + 13)}" y="${c + Math.sin(a) * (r + 13) + 4}" fill="#9aa4af" font-size="12" text-anchor="middle">${t}</text>`;
+    const [x, y] = pt(i * 90, r + 13);
+    return `<text x="${x}" y="${y + 4}" fill="#9aa4af" font-size="12" text-anchor="middle">${t}</text>`;
   }).join("");
-  const rw = rwys.map((x) => `<rect x="${c - 6}" y="${c - 70}" width="12" height="140" fill="#555" stroke="#888" transform="rotate(${x.heading} ${c} ${c})"/>`).join("");
+  let rw = "", marks = "";
+  pairs.forEach((g) => {
+    const role = (d) => (d === use.arr ? "arr" : d === use.dep ? "dep" : null);
+    const active = g.ends.find((e) => role(e.designator));
+    const col = active ? USE_COLOR[role(active.designator)] : null;
+    const hdg = g.ends[0].heading;
+    rw += `<rect x="${c - 7}" y="${c - 72}" width="14" height="144" fill="${col ? "#1f3a1a" : "#555"}" stroke="${col || "#888"}" stroke-width="${col ? 2 : 1}" transform="rotate(${hdg} ${c} ${c})"/>`;
+    g.ends.forEach((e) => {
+      const ro = role(e.designator);
+      // oznaczenie przy progu (z którego startuje / na który ląduje samolot lecący kursem pasa)
+      const [x, y] = pt(e.heading + 180, 86);
+      marks += `<text x="${x}" y="${y + 5}" text-anchor="middle" font-family="monospace" font-weight="700"
+        font-size="${ro ? 16 : 12}" fill="${ro ? USE_COLOR[ro] : "#c8ced4"}" stroke="#000" stroke-width="3" paint-order="stroke">${esc(e.designator)}</text>`;
+      if (ro) {
+        // szewrony wzdłuż pasa w kierunku ruchu
+        marks += `<g transform="rotate(${e.heading} ${c} ${c})" fill="none" stroke="${USE_COLOR[ro]}" stroke-width="3">${[48, 12, -24]
+          .map((o) => `<polyline points="${c - 5},${c + o + 6} ${c},${c + o} ${c + 5},${c + o + 6}"/>`).join("")}</g>`;
+      }
+    });
+  });
   let arrow = "";
   if (p.wind_dir !== null && p.wind_dir !== undefined) {
-    arrow = `<g transform="rotate(${p.wind_dir} ${c} ${c})"><line x1="${c}" y1="${c - r + 4}" x2="${c}" y2="${c - 30}" stroke="#2f8fff" stroke-width="4"/>
-      <polygon points="${c - 9},${c - 42} ${c + 9},${c - 42} ${c},${c - 26}" fill="#2f8fff"/></g>`;
+    arrow = `<g transform="rotate(${p.wind_dir} ${c} ${c})"><line x1="${c}" y1="${c - r + 4}" x2="${c}" y2="${c - 34}" stroke="#2f8fff" stroke-width="4"/>
+      <polygon points="${c - 9},${c - 46} ${c + 9},${c - 46} ${c},${c - 30}" fill="#2f8fff"/></g>`;
   }
   if (p.wind_var_from !== null && p.wind_var_from !== undefined) {
-    const arc = (deg) => { const a = (deg - 90) * Math.PI / 180; return [c + Math.cos(a) * (r - 18), c + Math.sin(a) * (r - 18)]; };
-    const [x1, y1] = arc(p.wind_var_from), [x2, y2] = arc(p.wind_var_to);
+    const [x1, y1] = pt(p.wind_var_from, r - 18), [x2, y2] = pt(p.wind_var_to, r - 18);
     const span = ((p.wind_var_to - p.wind_var_from) + 360) % 360;
     arrow += `<path d="M${x1},${y1} A${r - 18},${r - 18} 0 ${span > 180 ? 1 : 0} 1 ${x2},${y2}" stroke="#ffb020" stroke-width="3" fill="none"/>`;
   }
-  return `<svg class="windrose" viewBox="0 0 ${size} ${size}"><circle cx="${c}" cy="${c}" r="${r}" fill="#1b1f24" stroke="#3c444e"/>${ticks}${labels}${rw}${arrow}</svg>`;
+  return `<svg class="windrose" viewBox="0 0 ${size} ${size}"><circle cx="${c}" cy="${c}" r="${r}" fill="#1b1f24" stroke="#3c444e"/>${ticks}${labels}${rw}${arrow}${marks}</svg>`;
+}
+
+// Pas w użyciu z ATIS albo preferowany wg vPANDORA (wiatr, wyposażenie, LVP)
+function runwayBox(st) {
+  const u = st.runway_in_use || {};
+  const fromAtis = u.source === "ATIS";
+  const atc = st.atc_online || [];
+  const title = fromAtis ? `PAS W UŻYCIU · ATIS ${esc(st.atis?.letter || "")}` : "PAS PREFEROWANY";
+  const body = !u.arr ? "–" : u.arr === u.dep ? `<b>${esc(u.arr)}</b>`
+    : `<span>ARR</span><b style="color:${USE_COLOR.arr}">${esc(u.arr)}</b><span>DEP</span><b style="color:${USE_COLOR.dep}">${esc(u.dep)}</b>`;
+  let note = fromAtis ? `${esc(st.atis.callsign)}` : esc(u.reason || "");
+  if (!fromAtis && st.atis) note += `<br>ATIS ${esc(st.atis.letter || "")} online, nie udało się odczytać pasa`;
+  else if (!fromAtis && atc.length) note += `<br>Kontrola online (${atc.map((c) => esc(c.callsign)).join(", ")}), brak ATIS`;
+  if (fromAtis && st.preferred?.arr && st.preferred.arr !== u.arr) note += `<br><span class="hint">wg wiatru: ${esc(st.preferred.arr)}</span>`;
+  return `<div class="rwy-use ${fromAtis ? "atis" : "pref"}"><div class="label">${title}</div><div class="pair">${body}</div><div class="hint">${note}</div></div>`;
+}
+
+const EQUIP_SHOW = ["ILS", "LOC", "RNP", "VOR", "NDB"];
+function runwayTable(st) {
+  const u = st.runway_in_use || {};
+  const role = (d) => [d === u.arr ? "ARR" : "", d === u.dep ? "DEP" : ""].filter(Boolean).join("/");
+  return `<table class="data rwy-table"><thead><tr><th>Pas</th><th></th><th>Kurs</th><th>Dług. × szer.</th><th>Podejścia</th><th>Czołowy</th><th>Boczny</th></tr></thead><tbody>
+    ${st.runways.map((r) => {
+      const ro = role(r.designator);
+      return `<tr class="${ro ? "inuse" : ""}"><td class="rwy">${esc(r.designator)}</td><td>${ro ? `<span class="tag use">${ro}</span>` : ""}</td>
+      <td class="num">${fmt(r.heading, 0)}°</td><td class="num">${fmt(r.length_m, 0)}${r.width_m ? " × " + fmt(r.width_m, 0) : ""}</td>
+      <td>${(r.equipment || []).filter((k) => EQUIP_SHOW.includes(k)).map((k) => `<span class="eq ${k === "ILS" ? "ils" : ""}">${k}</span>`).join("")}</td>
+      <td class="num" style="color:${r.headwind < 0 ? "var(--bad)" : "inherit"}">${r.headwind === null ? "–" : (r.headwind < 0 ? "TW " : "") + Math.abs(r.headwind).toFixed(0)}</td>
+      <td class="num">${r.crosswind === null ? "–" : Math.abs(r.crosswind).toFixed(0) + (r.crosswind > 0 ? " R" : r.crosswind < 0 ? " L" : "")}</td></tr>`;
+    }).join("")}
+  </tbody></table><div class="hint">wiatr w kt · podejścia z procedur w pakiecie sektorowym</div>`;
+}
+
+// NOTAM: okres ważności względem teraz
+const dm = (iso) => { const d = new Date(iso); return `${String(d.getUTCDate()).padStart(2, "0")}.${String(d.getUTCMonth() + 1).padStart(2, "0")} ${d.toISOString().slice(11, 16)}Z`; };
+function span(ms) {
+  const min = Math.round(Math.abs(ms) / 60000);
+  if (min < 60) return `${min} min`;
+  if (min < 48 * 60) return `${Math.floor(min / 60)} h ${min % 60} min`;
+  return `${Math.round(min / 1440)} dni`;
+}
+function notamState(n, now = Date.now()) {
+  const s = n.start ? Date.parse(n.start) : null, e = n.end ? Date.parse(n.end) : null;
+  const endTxt = n.perm ? "PERM" : e ? `${dm(n.end)}${n.est ? " EST" : ""}` : "?";
+  if (e && e < now) return { cls: "expired", txt: `WYGASŁ ${dm(n.end)}` };
+  if (s && s > now) return { cls: "future", txt: `AKTYWNY OD ${dm(n.start)} (za ${span(s - now)}) do ${endTxt}` };
+  if (n.perm) return { cls: "active", txt: `AKTYWNY od ${s ? dm(n.start) : "?"} · PERM` };
+  if (e) return { cls: "active", txt: `AKTYWNY DO ${endTxt} (jeszcze ${span(e - now)})` };
+  return { cls: "", txt: "" };
+}
+const NOTAM_SORT = {
+  id: (a, b) => (a.id || "").localeCompare(b.id || ""),
+  start: (a, b) => (a.start || "").localeCompare(b.start || ""),
+  end: (a, b) => (a.perm - b.perm) || (a.end || "9").localeCompare(b.end || "9"),
+};
+
+// Ruch z sieci VATSIM: przyloty, odloty, plany złożone przed połączeniem
+function trafficHtml(t, icao) {
+  const fl = (a) => (a === null || a === undefined ? "–" : a >= 6000 ? "FL" + String(Math.round(a / 100)).padStart(3, "0") : a + " ft");
+  const cs = (p) => `<a href="#map/${encodeURIComponent(p.callsign)}" class="cs">${esc(p.callsign)}</a>`;
+  const arr = t.arrivals.map((p) => `<tr><td>${cs(p)}</td><td>${esc(p.aircraft || "–")}</td><td>${esc(p.departure || "?")}</td>
+    <td class="num">${p.state === "ground" ? "na ziemi" : fl(p.altitude)}</td><td class="num">${p.groundspeed ?? "–"}</td>
+    <td class="num">${p.dist_nm ?? "–"}</td><td class="num">${p.eta_min !== null && p.eta_min !== undefined ? p.eta_min + " min" : "–"}</td></tr>`).join("");
+  const dep = t.departures.map((p) => `<tr><td>${cs(p)}</td><td>${esc(p.aircraft || "–")}</td><td>${esc(p.arrival || "?")}</td>
+    <td class="num">${p.state === "ground" ? "na ziemi" : fl(p.altitude)}</td><td class="num">${p.groundspeed ?? "–"}</td>
+    <td class="num">${p.dist_nm ?? "–"}</td><td>${esc(p.rfl ? "RFL " + p.rfl : "")}</td></tr>`).join("");
+  const pre = t.prefiles.map((p) => `${esc(p.callsign)} ${esc(p.aircraft || "")} ${esc(p.departure || "")}→${esc(p.arrival || "")}${p.deptime ? " " + esc(p.deptime) + "Z" : ""}`).join(" · ");
+  const table = (title, n, head, rows) => `<h4>${title} <span class="hint">(${n})</span></h4>${n
+    ? `<table class="data traffic"><thead><tr>${head.map((x) => `<th>${x}</th>`).join("")}</tr></thead><tbody>${rows}</tbody></table>` : `<div class="hint">brak</div>`}`;
+  return table(`Przyloty do ${esc(icao)}`, t.arrivals.length, ["Callsign", "Typ", "Z", "Poziom", "GS", "NM", "ETA"], arr)
+    + table(`Odloty z ${esc(icao)}`, t.departures.length, ["Callsign", "Typ", "Do", "Poziom", "GS", "NM", ""], dep)
+    + (pre ? `<h4>Prefile <span class="hint">(${t.prefiles.length})</span></h4><div class="mono hint">${pre}</div>` : "");
 }
 
 function windText(p) {
@@ -92,26 +187,44 @@ export default {
       $("#ad-list").innerHTML = ads.map((a) => `<option value="${a.icao}">${esc(a.name)}</option>`).join("");
     });
 
-    const renderChecklist = async (el) => {
-      const data = await api(`/api/aerodromes/${icao}/checklist`);
-      const key = `checklist.${icao}`;
-      let done = {};
-      try { done = JSON.parse(localStorage.getItem(key) || "{}"); } catch { done = {}; }
-      el.innerHTML = data.items.map((t, i) => `<label><input type="checkbox" data-i="${i}" ${done[i] ? "checked" : ""}>${esc(t)}</label>`).join("") +
-        `<button class="btn reset" style="margin-top:6px">Wyczyść</button>`;
-      el.onchange = (e) => { done[e.target.dataset.i] = e.target.checked; localStorage.setItem(key, JSON.stringify(done)); };
-      el.querySelector(".reset").onclick = () => { localStorage.removeItem(key); renderChecklist(el); };
+    const renderOpenChecklist = async (el) => {
+      try {
+        const chk = await api(`/api/aerodromes/${icao}/checklist`);
+        el.closest(".card").querySelector("h3").textContent = chk.title;
+        renderChecklist(el, chk, `checklist.ad.${icao}`);
+      } catch (e) { el.innerHTML = `<span class="error">${esc(e.message)}</span>`; }
     };
 
+    const renderTraffic = async (el) => {
+      try {
+        el.innerHTML = trafficHtml(await api(`/api/vatsim/airport/${icao}`), icao);
+      } catch (e) { el.innerHTML = `<span class="error">${esc(e.message)}</span>`; }
+    };
+
+    let notamSort = localStorage.getItem("notam.sort") || "id";
     const renderNotams = async (el) => {
       el.innerHTML = `<span class="hint">Ładowanie NOTAM…</span>`;
-      try {
-        const data = await api(`/api/notam/${icao}`);
-        el.innerHTML = (data.notams.length
-          ? data.notams.map((n) => `<div class="notam"><b class="mono">${esc(n.id || "")}</b><pre>${esc(n.raw)}</pre></div>`).join("")
-          : `<span class="hint">Brak NOTAM-ów dla ${esc(icao)}.</span>`)
-          + (data.other ? `<p class="hint">Pominięto ${data.other} NOTAM-ów innych lotnisk i FIR.</p>` : "");
-      } catch (e) { el.innerHTML = `<span class="error">${esc(e.message)}</span>`; }
+      let data;
+      try { data = await api(`/api/notam/${icao}`); } catch (e) { el.innerHTML = `<span class="error">${esc(e.message)}</span>`; return; }
+      const draw = () => {
+        const list = [...data.notams].sort(NOTAM_SORT[notamSort] || NOTAM_SORT.id);
+        el.innerHTML = `<div class="notam-bar">Sortuj: ${[["id", "numer"], ["start", "początek"], ["end", "koniec"]].map(([k, l]) =>
+          `<button class="btn ${k === notamSort ? "primary" : ""}" data-sort="${k}">${l}</button>`).join("")}
+          <span class="hint">${list.length} NOTAM</span></div>`
+          + (list.length ? list.map((n) => {
+            const s = notamState(n);
+            return `<div class="notam ${s.cls}"><div class="nhead"><b class="mono">${esc(n.id || "")}</b><span class="valid">${esc(s.txt)}</span>
+              ${n.schedule ? `<span class="hint">harmonogram: ${esc(n.schedule)}</span>` : ""}</div><pre>${esc(n.raw)}</pre></div>`;
+          }).join("") : `<span class="hint">Brak NOTAM-ów dla ${esc(icao)}.</span>`);
+      };
+      el.onclick = (e) => {
+        const b = e.target.closest("button[data-sort]");
+        if (!b) return;
+        notamSort = b.dataset.sort;
+        localStorage.setItem("notam.sort", notamSort);
+        draw();
+      };
+      draw();
     };
 
     const renderFreqs = async (el, info) => {
@@ -163,6 +276,7 @@ export default {
           <div class="card" style="text-align:center">${windrose(st)}
             <div class="big">${windText(p).replace(/G\d+/, "")}${gust}</div>
             <div class="hint">${p.wind_speed !== null && p.wind_speed !== undefined ? `${Math.round(p.wind_speed * 0.514)} m/s` : ""}${p.wind_var_from !== null && p.wind_var_from !== undefined ? ` · zmienny ${p.wind_var_from}°–${p.wind_var_to}°` : ""}</div>
+            ${runwayBox(st)}
           </div>
           <div>
             <div class="values">
@@ -176,26 +290,23 @@ export default {
               ${value("Zjawiska", `<span style="font-size:15px">${esc((p.weather || []).join(" ") || "–")}</span>`)}
               ${value("Kategoria", `<span class="cat-${esc(p.flight_category)}">${esc(p.flight_category || "–")}</span>`, p.trend ? `<div class="hint mono">${esc(p.trend)}</div>` : "")}
             </div>
-            <div class="card" style="margin-top:12px">
-              <h3>Pasy · sugerowany: <span class="badge" style="color:var(--ok)">${esc(st.suggested_runway || "–")}</span> <span class="hint">${esc(st.suggestion_reason)}</span></h3>
-              <table class="data rwy-table"><thead><tr><th>Pas</th><th>Kurs (true)</th><th>Długość</th><th>Czołowy</th><th>Boczny</th></tr></thead><tbody>
-              ${st.runways.map((r) => `<tr><td class="mono ${r.designator === st.suggested_runway ? "sugg" : ""}">${esc(r.designator)}</td>
-                <td class="num">${fmt(r.heading, 0)}°</td><td class="num">${fmt(r.length_m, 0)} m</td>
-                <td class="num" style="color:${r.headwind < 0 ? "var(--bad)" : "inherit"}">${r.headwind === null ? "–" : (r.headwind < 0 ? "TW " : "") + Math.abs(r.headwind).toFixed(0) + " kt"}</td>
-                <td class="num">${r.crosswind === null ? "–" : Math.abs(r.crosswind).toFixed(0) + " kt " + (r.crosswind > 0 ? "R" : r.crosswind < 0 ? "L" : "")}</td></tr>`).join("")}
-              </tbody></table>
-            </div>
+            <div class="card" style="margin-top:12px"><h3>Pasy</h3>${runwayTable(st)}</div>
           </div>
           <div class="card"><h3>Checklista</h3><div class="checklist"></div></div>
         </div>
         <div class="grid two" style="margin-top:12px">
           <div class="card"><h3>Częstotliwości · online · rezerwacje</h3><div class="freqs"></div></div>
+          <div class="card"><h3>Ruch VATSIM</h3><div class="ad-traffic"><span class="hint">Ładowanie…</span></div></div>
           <div class="card"><h3>TAF</h3><div class="wx">${st.taf ? wxLines("taf", st.taf) : colorize(null)}</div></div>
+          <div class="card"><h3>ATIS ${st.atis ? esc(st.atis.letter || "") : ""}</h3>${st.atis
+            ? `<div class="mono atis-text">${st.atis.lines.map(esc).join("<br>")}</div>`
+            : `<span class="hint">${st.network_error ? esc(st.network_error) : "ATIS nie jest teraz nadawany w sieci VATSIM."}</span>`}</div>
           <div class="card" style="grid-column:1/-1"><h3>NOTAM</h3><div class="notams"></div></div>
         </div>`;
       renderFreqs(content.querySelector(".freqs"), info);
       renderNotams(content.querySelector(".notams"));
-      renderChecklist(content.querySelector(".checklist"));
+      renderOpenChecklist(content.querySelector(".checklist"));
+      renderTraffic(content.querySelector(".ad-traffic"));
     };
 
     const go = (code) => {

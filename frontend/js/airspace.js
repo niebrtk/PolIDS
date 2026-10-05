@@ -79,3 +79,43 @@ export function aircraftMarker(p, { label = true, detail = false } = {}) {
     + (label ? `<span>${esc(p.callsign)}${detail ? `<br>${fl} ${esc(p.aircraft || "")} ${p.groundspeed ?? ""}` : ""}</span>` : "") + "</div>";
   return L.marker([p.lat, p.lon], { icon: L.divIcon({ className: "acicon", html, iconSize: [20, 20], iconAnchor: [10, 10] }) });
 }
+
+// Symbole punktów jak w EuroScope (SYMBOLDEF, jednostki = piksele, oś Y w dół).
+// Linie: [[x, y], ...] rysowane jako łamana; okrąg: {circle: promień}.
+export const SYMBOLS = {
+  aerodrome: [[[-2, -4], [4, -4]], [[4, -4], [7, -1]], [[7, -1], [4, 2]], [[4, 2], [-2, 2]], [[-2, 2], [-6, -2]], [[-4, -2], [-2, -4]]],
+  vor: [[[-4, 0], [-2, 2], [2, 2], [4, 0], [2, -2], [-2, -2], [-4, 0]]],
+  ndb: [[[0, -4], [-2, 0], [0, 4], [2, 0], [0, -4]]],
+  vfr: { circle: 3 },
+  fix: { circle: 4 },
+};
+export const symbolFor = (kind) => ({ AD: "aerodrome", VOR: "vor", "VOR-DME": "vor", VORTAC: "vor", DME: "vor", NDB: "ndb", "NDB-DME": "ndb", VFR: "vfr" }[kind] || "fix");
+
+// Ikona SVG symbolu (legenda, przyciski warstw)
+export function symbolSvg(name, color = "currentColor", size = 18, scale = 1.6) {
+  const sym = SYMBOLS[name];
+  const v = size / 2 / scale;
+  const body = sym.circle ? `<circle cx="0" cy="0" r="${sym.circle}"/>`
+    : sym.map((line) => `<polyline points="${line.map(([x, y]) => `${x},${y}`).join(" ")}"/>`).join("");
+  return `<svg class="sym" width="${size}" height="${size}" viewBox="${-v} ${-v} ${2 * v} ${2 * v}" fill="none" stroke="${color}" stroke-width="${1.4 / scale * 1.4}">${body}</svg>`;
+}
+
+// Marker rysowany na kanwie (mapa z preferCanvas): kształt z SYMBOLS, skalowany. Obsługuje dymki i kliknięcia
+// jak CircleMarker (obszar trafienia = promień).
+export const SymbolMarker = L.CircleMarker.extend({
+  options: { symbol: "fix", scale: 1.6, fill: false, weight: 1.6, radius: 8 },
+  _updatePath() {
+    const r = this._renderer;
+    if (!r._ctx) { r._updateCircle(this); return; }
+    if (!r._drawing || this._empty()) return;
+    const ctx = r._ctx, p = this._point, s = this.options.scale, sym = SYMBOLS[this.options.symbol] || SYMBOLS.fix;
+    ctx.beginPath();
+    if (sym.circle) {
+      ctx.moveTo(p.x + sym.circle * s, p.y);
+      ctx.arc(p.x, p.y, sym.circle * s, 0, Math.PI * 2);
+    } else {
+      sym.forEach((line) => line.forEach(([x, y], i) => (i ? ctx.lineTo : ctx.moveTo).call(ctx, p.x + x * s, p.y + y * s)));
+    }
+    r._fillStroke(ctx, this);
+  },
+});

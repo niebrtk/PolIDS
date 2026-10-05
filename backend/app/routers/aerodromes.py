@@ -10,7 +10,8 @@ from ..models import Aerodrome, AtcPosition
 from ..services.http_cache import UpstreamError
 from ..services.lvp import evaluate as evaluate_lvp
 from ..services.metar import parse_metar, qfe_from_qnh
-from ..services.runways import runway_heading, suggest_runway, wind_components
+from ..services.runways import equipment_for, runway_config, runway_heading, select_runways, wind_components
+from ..services.vatsim import controller_info, get_feed, parse_atis
 from ..services.weather import get_metars, get_tafs
 
 router = APIRouter(prefix="/api/aerodromes", tags=["aerodrome"])
@@ -66,23 +67,62 @@ async def status(icao: str, db: Session = Depends(get_db)):
 
     wd = parsed.wind_dir if parsed else None
     ws = parsed.wind_speed if parsed else None
+    cfg = runway_config(ad.icao)
+    equipment = equipment_for(ad.icao, cfg)
     rwys = [{"designator": r.designator, "heading": runway_heading(r.designator, r.heading_true),
-             "preferred": r.preferred, "length_m": r.length_m} for r in ad.runways]
+             "preferred": r.preferred, "length_m": r.length_m, "width_m": r.width_m, "surface": r.surface,
+             "equipment": equipment.get(r.designator, [])} for r in ad.runways]
     for r in rwys:
         r["headwind"], r["crosswind"] = wind_components(wd, ws, r["heading"])
-    best, reason = suggest_runway(rwys, wd, ws)
+    lvp = evaluate_lvp(parsed, ad.icao)
+    low_vis = lvp["state"] or ("IMC" if parsed and parsed.flight_category in ("IFR", "LIFR") else None)
+    pref = select_runways(rwys, wd, ws, equipment=equipment, low_vis=low_vis, config=cfg)
+
+    # Kontrola w sieci VATSIM: ATIS (litera, pas w użyciu) i zalogowane stanowiska lotniska
+    atc, atis, net_error = [], None, None
+    try:
+        feed = await get_feed()
+        stations = feed.get("controllers", []) + feed.get("atis", [])
+        mine = [c for c in stations if c.get("callsign", "").startswith(ad.icao + "_")]
+        atc = [controller_info(c) for c in mine if not c["callsign"].endswith("_ATIS")]
+        designators = [r["designator"] for r in rwys]
+        for c in sorted((c for c in mine if c["callsign"].endswith("_ATIS")), key=lambda c: c["callsign"]):
+            info = parse_atis(c.get("text_atis"), designators, c.get("atis_code"))
+            kind = "dep" if "_D_ATIS" in c["callsign"] else "arr" if "_A_ATIS" in c["callsign"] else "both"
+            if atis is None:
+                atis = {"callsign": c["callsign"], "letter": info["letter"], "arr": None, "dep": None,
+                        "frequency": c.get("frequency"), "lines": c.get("text_atis") or []}
+            else:
+                atis["callsign"] += " / " + c["callsign"]
+                atis["letter"] = " / ".join(x for x in (atis["letter"], info["letter"]) if x)
+                atis["lines"] = atis["lines"] + (c.get("text_atis") or [])
+            if kind in ("arr", "both") and info["arr"]:
+                atis["arr"] = atis["arr"] or info["arr"]
+            if kind in ("dep", "both") and info["dep"]:
+                atis["dep"] = atis["dep"] or info["dep"]
+    except (UpstreamError, ValueError) as exc:
+        net_error = f"VATSIM: {exc}"
+    if atis and (atis["arr"] or atis["dep"]):
+        in_use = {"arr": atis["arr"] or atis["dep"], "dep": atis["dep"] or atis["arr"], "source": "ATIS",
+                  "reason": f"Z ATIS {atis['letter'] or ''}".strip()}
+    else:
+        in_use = {**pref, "source": "vPANDORA"}
 
     qfe = qfe_from_qnh(parsed.qnh, ad.elevation_ft or 0) if parsed and parsed.qnh else None
     return {
         "icao": ad.icao, "name": ad.name, "elevation_ft": ad.elevation_ft,
         "metar": metar, "parsed": parsed.to_dict() if parsed else None, "taf": taf,
-        "qfe": qfe, "runways": rwys, "lvp": evaluate_lvp(parsed, ad.icao),
-        "suggested_runway": best["designator"] if best else None, "suggestion_reason": reason,
+        "qfe": qfe, "runways": rwys, "lvp": lvp,
+        "preferred": pref, "runway_in_use": in_use, "atis": atis, "atc_online": atc, "network_error": net_error,
+        # zgodność wstecz
+        "suggested_runway": pref["arr"], "suggestion_reason": pref["reason"],
         "errors": errors,
     }
 
 
 @router.get("/{icao}/checklist")
 def checklist(icao: str):
+    """Checklista otwarcia stanowiska (ta sama co w zakładce CHECKLIST)."""
     data = json.loads((settings.seed_dir / "checklists.json").read_text("utf-8"))
-    return {"icao": icao.upper(), "items": data.get("DEFAULT", []) + data.get(icao.upper(), [])}
+    chk = next(c for c in data["checklists"] if c["id"] == data.get("aerodrome", "open-position"))
+    return {"icao": icao.upper(), **chk}

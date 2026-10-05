@@ -22,9 +22,10 @@ def config():
         "links": {
             "aip_ifr": settings.aip_ifr_url, "aip_vfr": settings.aip_vfr_url, "aip_mil": settings.aip_mil_url,
             "inop": settings.inop_url, "imgw": settings.imgw_url, "sectors": settings.sectors_url,
+            "phraseology": settings.phraseology_url, "performance_db": settings.performance_db_url,
         },
-        "inop_hide_footer_px": settings.inop_hide_footer_px,
         "openaip_api_key": settings.openaip_api_key,
+        "carto_api_key": settings.carto_api_key,
         "metar_source": settings.metar_source,
     }
 
@@ -32,6 +33,12 @@ def config():
 @router.get("/emergency")
 def emergency():
     return json.loads((settings.seed_dir / "emergency.json").read_text("utf-8"))
+
+
+@router.get("/checklists")
+def checklists():
+    """Checklisty stanowiska (otwarcie, zamknięcie, przekazanie, zmiana pasa) w formacie vatiris."""
+    return json.loads((settings.seed_dir / "checklists.json").read_text("utf-8"))
 
 
 @router.get("/status")

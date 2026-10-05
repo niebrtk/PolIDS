@@ -10,16 +10,18 @@ Wygląd wzorowany na PANDORZE: czarne tło, kolumna zielonych przycisków menu i
 | Menu | Co jest | Skąd dane |
 |---|---|---|
 | **?** | wersja, AIRAC, stan bazy, ostatnie zmiany | API |
-| **RADIO** | EPWW ACC (lista CTR i FIS + mapa sektorów z obsadą), lotniska (IFR, VFR, MIL), każdy FIR sąsiedni osobno; podświetlenie kto jest online i rezerwacji | `.ese`, [VATSIM data feed i ATC bookings](https://vatsim.dev/services/apis), granice FIR z VATSpy |
-| **METEO** | METAR PL / MIL / INTL, TAF PL / INTL (kolorowane, okresy zmian w osobnych liniach), mapa QNH jak w PANDORZE, Windy (wiatr, radar, satelita), IMGW AWIACJA | metar.vatsim.net / aviationweather.gov, awiacja.imgw.pl |
-| **AERODROME** | AWOS: róża wiatrów, QNH/QFE, widzialność, chmury, RVR, składowe wiatru, **pas sugerowany**, **wskaźnik LVP z powodem**, wiek METAR, TAF, NOTAM tylko dla lotniska, częstotliwości z obsadą i rezerwacjami, checklista | METAR/TAF jw., NOTAM z cv.plvacc.pl, VATSIM, pasy z OurAirports, stanowiska z `.ese`, progi LVP w `data/seed/lvp.json` |
+| **RADIO** | EPWW ACC (lista CTR i polskich FIS + mapa sektorów z obsadą), lotniska (IFR, VFR, MIL) w jednej kolumnie, każdy FIR sąsiedni osobno (najpierw ACC/CTR); podświetlenie kto jest online i rezerwacji na bieżącą dobę UTC | `.ese`, [VATSIM data feed i ATC bookings](https://vatsim.dev/services/apis), granice FIR z VATSpy |
+| **METEO** | METAR PL / MIL / INTL, TAF PL / INTL (kolorowane, okresy zmian w osobnych liniach), mapa QNH jak w PANDORZE, Windy (wiatr, radar, satelita) | metar.vatsim.net / aviationweather.gov |
+| **AERODROME** | AWOS: róża wiatrów z zaznaczonym kierunkiem pasa, QNH/QFE, widzialność, chmury, RVR, składowe wiatru, **pas w użyciu z ATIS** albo **pas preferowany** (wiatr, ILS, LVP), **wskaźnik LVP z powodem**, wiek METAR, TAF, ATIS, ruch VATSIM (przyloty, odloty, prefile), NOTAM-y lotniska z czasem ważności i sortowaniem, częstotliwości z obsadą i rezerwacjami, checklista *Open position* | METAR/TAF jw., NOTAM z cv.plvacc.pl, VATSIM, pasy z OurAirports, podejścia (ILS) z procedur w `.ese`, `data/seed/runway_config.json`, progi LVP w `data/seed/lvp.json` |
 | **AD CIV / AD MIL / AD VFR** | eAIP PAŻP | iframe + „otwórz w nowej karcie” |
 | **CALLSIGN** | baza callsignów, podmenu A–Z, oznaczenie CARGO / MILITARY | `ICAO_Airlines.txt`, `GRpluginOperatorInfo.txt` |
-| **AIRCRAFT** | typy: WTC, RECAT-EU, wymiary, MTOW, zdjęcie, podmenu A–Z | aircraft-database.com + `ICAO_Aircraft.json`, zdjęcia w `data/photos/` (brakujące pobierane raz z Wikipedii) |
-| **MAP** | sektory EPWW na wybranym FL z aktualną obsadą, FIR-y sąsiednie online, samoloty z VATSIM (kliknięcie = plan lotu i trasa), trasa z planu lotu po drogach lotniczych, VOR/NDB/FIX | `.sct`, `.ese`, `airway.txt`, `isec.txt`, VATSIM, VATSpy |
-| **INOP** | om.plvacc.pl (bez dużej stopki; wysokość do ukrycia ustawiasz na pasku) | iframe |
+| **AIRCRAFT** | typy: WTC, RECAT-EU, wymiary, MTOW, zdjęcie, link do EUROCONTROL Aircraft Performance Database, podmenu A–Z | aircraft-database.com + `ICAO_Aircraft.json`, zdjęcia w `data/photos/` (brakujące pobierane raz z Wikipedii) |
+| **MAP** | sektory EPWW na wybranym FL z aktualną obsadą, FIR-y sąsiednie online, samoloty z VATSIM (kliknięcie = plan lotu i trasa), trasa z planu lotu po drogach lotniczych, lotniska / VOR / NDB / FIX / punkty VFR symbolami EuroScope, podkład ciemny, jasny, biały albo OSM | `.sct`, `.ese`, `airway.txt`, `isec.txt`, VATSIM, VATSpy |
+| **INOP** | om.plvacc.pl | iframe |
 | **DOCS** | PDF-y z folderu `data/docs/` otwierane w aplikacji | `data/docs/` |
-| **EMERGENCY** | procedury awaryjne (czerwona ramka) | `data/seed/emergency.json` |
+| **PHRASEOLOGY** | frazeologia EUROCONTROL Learning Zone | iframe + „otwórz w nowej karcie” |
+| **CHECKLIST** | Open position, Close position, Handover/takeover, Runway change (zaznaczenia zostają w przeglądarce) | `data/seed/checklists.json` (z vatiris) |
+| **EMERGENCY** | procedury awaryjne do wyboru: ASSIST, A06 i 16 checklist EUROCONTROL (czerwona ramka) | `data/seed/emergency.json` |
 
 Dokumentacja API (Swagger) po uruchomieniu: <http://127.0.0.1:8000/docs>
 
@@ -60,7 +62,10 @@ ponownie i rozpakuj w miejsce starego folderu. Jeśli po aktualizacji coś wygl�
 ### Ustawienia
 
 Skopiuj `.env.example` do `.env`. Najważniejsze: domyślne lotnisko, źródło METAR, linki eAIP (zmieniają się co AIRAC),
-serwer NOTAM i klucz OpenAIP do nakładki lotniczej na mapie.
+serwer NOTAM, klucz OpenAIP do nakładki lotniczej na mapie i opcjonalny klucz CARTO do podkładów mapy.
+
+Klucze API wpisuj tylko w lokalnym pliku `.env` (jest w `.gitignore`), np. `VPANDORA_CARTO_API_KEY=...`.
+Repozytorium jest publiczne, więc klucze nie powinny trafiać do żadnego pliku w repo.
 
 ### Aktualizacja danych
 
@@ -68,8 +73,23 @@ serwer NOTAM i klucz OpenAIP do nakładki lotniczej na mapie.
   albo `python -m backend.app.importers.seed --force`.
 - Lotniska/pasy/VOR z OurAirports: `python scripts/fetch_ourairports.py`, potem usuń `data/vpandora.db`.
 - Baza samolotów: `python scripts/build_aircraft_seed.py ŚCIEŻKA/do/aircraft-db`.
-- Konfiguracja bez kodu: `data/seed/qnh_regions.json` (regiony QNH), `data/seed/lvp.json` (progi LVP), `data/seed/checklists.json` (checklisty),
-  `data/seed/callsigns.csv`.
+- Konfiguracja bez kodu: `data/seed/qnh_regions.json` (regiony QNH), `data/seed/lvp.json` (progi LVP),
+  `data/seed/runway_config.json` (pasy preferowane), `data/seed/checklists.json` (checklisty),
+  `data/seed/emergency.json` (procedury awaryjne), `data/seed/callsigns.csv`.
+
+### Pas preferowany (AERODROME)
+
+Gdy na lotnisku nadaje ATIS w sieci VATSIM, pas w użyciu i litera ATIS są czytane z jego tekstu
+(np. „RWY 29 IN USE”, „33 FOR LANDING, 29 FOR TAKEOFF”). Bez ATIS-u vPANDORA wskazuje pas preferowany
+według zasady z [vatiris](https://github.com/minsulander/vatiris) (`stores/wind.ts`):
+
+1. przy LVP, przygotowaniu LVP albo IMC: kierunek z ILS, jeśli wiatr w plecy nie przekracza 5 kt;
+2. przy wietrze słabszym niż limit (domyślnie 5 kt): konfiguracja z `data/seed/runway_config.json` (`arr`/`dep`),
+   a bez niej kierunek wyposażony w ILS;
+3. w pozostałych przypadkach: największa składowa czołowa.
+
+Wyposażenie pasów (ILS, RNP, VOR, NDB) jest odczytywane z nazw procedur podejścia w pliku `.ese`. Konfiguracje
+w `runway_config.json` (na razie tylko EPWA: lądowanie 33, start 29) warto sprawdzić z LoA / AIP.
 
 ### Testy
 
@@ -113,8 +133,10 @@ vpandora/
   Wtedy działa przycisk „Otwórz w nowej karcie”. Docelowo można je pobierać przez backend.
 - Format odpowiedzi serwera NOTAM (cv.plvacc.pl) nie jest udokumentowany; parser dzieli tekst po
   nagłówkach `A1234/26 NOTAMN`, a przy innym formacie pokazuje całość.
-- Pas sugerowany = największa składowa czołowa; preferencje pasów przy słabym wietrze (kolumna `preferred`)
-  są w bazie, ale nie są jeszcze wypełnione dla żadnego lotniska.
+- Pas preferowany przy słabym wietrze jest skonfigurowany tylko dla EPWA; kategorie ILS (CAT I/II/III) nie są
+  jeszcze brane pod uwagę.
+- Parser ATIS rozpoznaje typowe formaty vATIS; przy nietypowym tekście pokazuje pas preferowany i informację, że ATIS jest online.
+- Strony EUROCONTROL Learning Zone (frazeologia, baza osiągów) mogą wymagać logowania albo blokować ramkę.
 - QFE liczone w przybliżeniu z QNH i elewacji lotniska.
 - Brak logowania (aplikacja do użytku lokalnego / w sieci vACC).
 - API rezerwacji VATSIM podaje tylko CID. Imię i nazwisko przy rezerwacji widać, gdy ta osoba jest akurat zalogowana w sieci.
@@ -130,3 +152,6 @@ vpandora/
 - Granice FIR: [vatsimnetwork/vatspy-data-project](https://github.com/vatsimnetwork/vatspy-data-project) (CC BY-SA 4.0), plik `data/seed/vatspy_firs.geojson`.
 - Zdjęcia samolotów pobierane z Wikipedii; autor i licencja są na stronie artykułu podlinkowanej pod zdjęciem.
 - Pliki EuroScope (pakiet sektorowy PL vACC / GNG) są w `data/import/`, PDF-y w `data/docs/`.
+- Checklisty stanowiska i zasada wyboru pasa: [minsulander/vatiris](https://github.com/minsulander/vatiris) (GPL-3.0).
+- Checklisty EMERGENCY: EUROCONTROL, *Guidelines for Controller Training in the Handling of Unusual/Emergency Situations*
+  (HRS/TSP-004-GUI-05, wyd. 2.0), Annex A i B.

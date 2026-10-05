@@ -1,6 +1,6 @@
 from datetime import date
 
-from backend.app.importers.ese import parse_ese
+from backend.app.importers.ese import parse_ese, parse_vfr_points
 from backend.app.importers.navdata import parse_airways
 from backend.app.importers.sct import parse_coord, parse_sct
 from backend.app.services.airac import current_airac
@@ -11,8 +11,8 @@ from types import SimpleNamespace
 from backend.app.importers.callsigns import parse_gr_operator_info
 from backend.app.services.lvp import evaluate as evaluate_lvp
 from backend.app.services.notam import for_aerodrome, split_notams
-from backend.app.services.vatsim import bookings_by_callsign, match_positions, online_firs
-from backend.app.services.runways import suggest_runway, wind_components
+from backend.app.services.vatsim import airport_traffic, bookings_by_callsign, match_positions, online_firs, parse_atis
+from backend.app.services.runways import runway_equipment, select_runways, suggest_runway, wind_components
 
 
 def test_metar_basic():
@@ -48,7 +48,33 @@ def test_wind_components_and_suggestion():
     best, _ = suggest_runway(rwys, 280, 15)
     assert best["designator"] == "29"
     best, reason = suggest_runway(rwys, 120, 2)
-    assert best["designator"] == "33" and "preferowany" in reason
+    assert best["designator"] == "33" and "preferowan" in reason
+
+
+def test_runway_selection_equipment_and_lvp():
+    rwys = [{"designator": d, "heading": h} for d, h in (("11", 115), ("29", 295), ("15", 152), ("33", 332))]
+    eq = {"11": ["ILS", "RNP"], "33": ["ILS", "RNP"], "29": ["RNP"], "15": ["RNP"]}
+    cfg = {"arr": "33", "dep": "29", "limit": 5}
+    assert select_runways(rwys, 120, 2, equipment=eq, config=cfg) == {
+        "arr": "33", "dep": "29", "reason": "Wiatr < 5 kt: konfiguracja preferowana lotniska"}
+    # wiatr z zachodu: największa składowa czołowa na 29, ale przy LVP wybieramy kierunek z ILS (33, w plecy ≤ 5 kt)
+    assert select_runways(rwys, 290, 12, equipment=eq, config=cfg)["arr"] == "29"
+    lvp = select_runways(rwys, 290, 12, equipment=eq, config=cfg, low_vis="LVP")
+    assert lvp["arr"] == "33" and "ILS" in lvp["reason"]
+    # słaby wiatr bez konfiguracji: kierunek z ILS
+    assert select_runways(rwys[:2], 200, 3, equipment=eq)["arr"] == "11"
+    assert select_runways(rwys, 290, 12, config={"never": ["29"]})["arr"] != "29"
+    # wyposażenie z pakietu sektorowego
+    assert "ILS" in runway_equipment()["EPWA"]["33"]
+
+
+def test_parse_atis():
+    rw = ["11", "29", "15", "33"]
+    a = parse_atis(["WARSAW CHOPIN INFORMATION K TIME 1630", "RUNWAY IN USE FOR LANDING 33, DEPARTURE RUNWAY 29"], rw)
+    assert (a["letter"], a["arr"], a["dep"]) == ("K", "33", "29")
+    assert parse_atis(["EPWA INFO C RWY 29 IN USE"], rw)["arr"] == "29"
+    assert parse_atis(["33 FOR LANDING 29 FOR TAKEOFF"], rw, "D")["letter"] == "D"
+    assert parse_atis(["RWY 07 IN USE"], rw)["arr"] is None
 
 
 def test_airac():
@@ -101,6 +127,8 @@ def test_notam_split():
     n = split_notams(text)
     assert [x["id"] for x in n] == ["A1234/26", "A1235/26"]
     assert n[0]["fields"]["E"] == "RWY 11/29 CLSD"
+    assert (n[0]["start"], n[0]["end"], n[0]["perm"]) == ("2026-10-05T06:00:00+00:00", "2026-10-05T18:00:00+00:00", False)
+    assert n[1]["perm"] is True and n[1]["end"] is None
 
 
 def test_notam_only_for_aerodrome():
@@ -136,6 +164,29 @@ def test_vatsim_matching_and_bookings():
              {"cid": 7, "callsign": "EDDB_TWR", "start": fmt(now), "end": fmt(now + timedelta(hours=1))}]
     out = bookings_by_callsign(books, "EP", now=now)
     assert list(out) == ["EPWA_TWR"] and out["EPWA_TWR"][0]["active"] is False
+    # tylko bieżąca doba UTC: rezerwacja na jutro rano nie wchodzi
+    tomorrow = [{"cid": 8, "callsign": "EPKK_APP", "start": fmt(now + timedelta(hours=8)), "end": fmt(now + timedelta(hours=9))}]
+    assert bookings_by_callsign(tomorrow, "EP", now=now) == {}
+
+
+def test_airport_traffic():
+    feed = {"pilots": [
+        {"callsign": "LOT1", "latitude": 52.5, "longitude": 21.0, "groundspeed": 300, "altitude": 9000,
+         "flight_plan": {"departure": "EGLL", "arrival": "EPWA"}},
+        {"callsign": "LOT2", "latitude": 52.166, "longitude": 20.967, "groundspeed": 0, "altitude": 360,
+         "flight_plan": {"departure": "EPWA", "arrival": "EPKK"}},
+        {"callsign": "DLH1", "latitude": 50.0, "longitude": 8.0, "groundspeed": 400, "flight_plan": {"departure": "EDDF", "arrival": "EDDM"}}],
+        "prefiles": [{"callsign": "LOT3", "flight_plan": {"departure": "EPWA", "arrival": "EPGD", "deptime": "1800"}}]}
+    t = airport_traffic(feed, "EPWA", 52.166, 20.967)
+    assert [p["callsign"] for p in t["arrivals"]] == ["LOT1"] and 15 < t["arrivals"][0]["dist_nm"] < 30
+    assert t["arrivals"][0]["eta_min"] is not None
+    assert t["departures"][0]["state"] == "ground" and t["prefiles"][0]["callsign"] == "LOT3"
+
+
+def test_vfr_points():
+    text = "[FREETEXT]\nN052.03.47.000:E020.44.35.000:EPBC VFR:A\nN052.0.0.0:E020.0.0.0:EPWA STANDS:1\n[GROUND]\n"
+    pts = parse_vfr_points(text)
+    assert len(pts) == 1 and pts[0]["ident"] == "A" and pts[0]["kind"] == "VFR" and abs(pts[0]["lat"] - 52.063) < 0.01
 
 
 def test_gr_operator_info():

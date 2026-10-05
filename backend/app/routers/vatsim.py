@@ -1,13 +1,15 @@
+from datetime import datetime, timedelta, timezone
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..models import AtcPosition
+from ..models import Aerodrome, AtcPosition
 from ..services.http_cache import UpstreamError
 from ..services.route import RouteResolver
-from ..services.vatsim import (bookings_by_callsign, controller_info, fir_boundaries, get_bookings, get_feed,
-                               match_positions, online_firs, pilot_info)
+from ..services.vatsim import (airport_traffic, bookings_by_callsign, controller_info, fir_boundaries, get_bookings,
+                               get_feed, match_positions, online_firs, pilot_info)
 
 router = APIRouter(prefix="/api/vatsim", tags=["vatsim"])
 
@@ -31,13 +33,15 @@ async def online(db: Session = Depends(get_db)):
 
 
 @router.get("/bookings")
-async def bookings(prefix: str = "EP", hours: int = Query(24, ge=1, le=168)):
-    """Rezerwacje stanowisk z atc-bookings.vatsim.net (trwające i na najbliższe `hours` godzin)."""
+async def bookings(prefix: str = "EP", hours: int | None = Query(None, ge=1, le=168)):
+    """Rezerwacje stanowisk z atc-bookings.vatsim.net: trwające i zaczynające się jeszcze dziś (doba UTC),
+    albo w ciągu `hours` godzin, jeśli podano."""
     try:
         data = await get_bookings()
     except (UpstreamError, ValueError) as exc:
         raise HTTPException(502, f"VATSIM ATC bookings niedostępne: {exc}") from exc
-    result = bookings_by_callsign(data, prefix, hours_ahead=hours)
+    until = datetime.now(timezone.utc) + timedelta(hours=hours) if hours else None
+    result = bookings_by_callsign(data, prefix, until=until)
     # API rezerwacji podaje tylko CID; imię i nazwisko znamy, jeśli ta osoba jest teraz zalogowana w sieci
     try:
         feed = await get_feed()
@@ -48,6 +52,15 @@ async def bookings(prefix: str = "EP", hours: int = Query(24, ge=1, le=168)):
         for b in lst:
             b["name"] = names.get(b["cid"])
     return result
+
+
+@router.get("/airport/{icao}")
+async def airport(icao: str, db: Session = Depends(get_db)):
+    """Bieżące loty z/do lotniska (piloci w sieci z planem lotu i prefile)."""
+    data = await _feed()
+    ad = db.get(Aerodrome, icao.upper())
+    return {"icao": icao.upper(), **airport_traffic(data, icao, ad.lat if ad else None, ad.lon if ad else None),
+            "updated": data.get("general", {}).get("update_timestamp")}
 
 
 @router.get("/firs")

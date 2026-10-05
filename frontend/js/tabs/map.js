@@ -1,74 +1,150 @@
-import { BASEMAPS, api, atcPositions, esc, h, hhmm, vatsimOnline } from "../api.js";
-import { aircraftMarker, drawFirs, drawSectors, fl, loadFirs, sectorOwners } from "../airspace.js";
+import { BASEMAPS, LIGHT_BASEMAPS, api, atcPositions, esc, h, hhmm, vatsimOnline } from "../api.js";
+import { SymbolMarker, aircraftMarker, drawFirs, drawSectors, fl, loadFirs, sectorOwners, symbolFor, symbolSvg } from "../airspace.js";
+
+// Kolory zależne od podkładu (ciemny / jasny)
+const THEME = {
+  dark: { ad: "#c8ced4", vor: "#3ecf6e", ndb: "#c58cff", fix: "#8c969e", vfr: "#ffb020", route: "#ff4dd2", flight: "#ff9f1a", halo: "#000", airway: "#5f6b78" },
+  light: { ad: "#33393f", vor: "#0a7a36", ndb: "#7b2cbf", fix: "#5c656c", vfr: "#c26a00", route: "#b0007c", flight: "#d4380d", halo: "#fff", airway: "#8b96a0" },
+};
+const KIND_COLOR = { aerodrome: "ad", vor: "vor", ndb: "ndb", fix: "fix", vfr: "vfr" };
+const sw = (cls, label, checked = false, sym = "") => `<label class="sw"><input type="checkbox" class="${cls}" ${checked ? "checked" : ""}>
+  <span class="sw-sym">${sym}</span><span>${label}</span></label>`;
 
 export default {
   mount(root, ctx) {
     const pane = h(`<div class="pane fill"><div class="mapwrap">
       <div class="mapside">
-        <h4>TRASA</h4>
-        <textarea class="field route" rows="4" style="width:100%" placeholder="np. EPKK OKENO N871 POLON L980 VAMPU EPGD"></textarea>
-        <button class="btn primary show-route">Pokaż trasę</button> <button class="btn clear-route">Wyczyść</button>
-        <div class="route-info hint" style="margin-top:6px"></div>
-        <h4>SEKTORYZACJA</h4>
-        <label>Poziom FL <input type="number" class="field fl" value="300" min="0" max="660" step="5" style="width:80px"></label>
-        <label><input type="checkbox" class="sectors" checked> sektory EPWW</label>
-        <label><input type="checkbox" class="online" checked> aktualna (kto jest online)</label>
-        <label><input type="checkbox" class="firs" checked> FIR-y sąsiednie (VATSpy)</label>
-        <div class="sector-info hint"></div>
-        <h4>RUCH (VATSIM)</h4>
-        <label><input type="checkbox" class="traffic" checked> samoloty</label>
-        <label><input type="checkbox" class="traffic-detail"> etykiety z FL, typem i prędkością</label>
-        <div class="traffic-info hint"></div>
-        <div class="flight card" style="display:none;margin-top:6px"></div>
-        <h4>WARSTWY</h4>
-        <label><input type="checkbox" class="airways"> drogi lotnicze (przybliż mapę)</label>
-        <label><input type="checkbox" class="navaids" checked> VOR / NDB</label>
-        <label><input type="checkbox" class="fixes"> punkty (FIX, od zoom 8)</label>
-        <label><input type="checkbox" class="ads" checked> lotniska PL</label>
-        <h4>PODKŁAD</h4>
-        <label><input type="radio" name="base" value="dark" checked> ciemny (CARTO)</label>
-        <label><input type="radio" name="base" value="osm"> OpenStreetMap</label>
-        <label><input type="checkbox" class="openaip"> nakładka lotnicza OpenAIP</label>
-        <div class="hint openaip-note"></div>
-        <p class="hint">Oficjalna mapa sektorów: <a href="${esc(ctx.config.links.sectors)}" target="_blank" rel="noopener">plvacc.pl/acc-sectors ↗</a></p>
+        <div class="ms-head"><b>MAPA</b><span class="hint">AIRAC ${esc(ctx.config.airac?.ident || "")}</span>
+          <button class="btn ms-hide" title="Schowaj panel">«</button></div>
+        <section class="ms-card">
+          <h4>Ruch VATSIM</h4>
+          ${sw("traffic", "samoloty", true, `<svg class="sym" width="18" height="18" viewBox="-10 -10 20 20"><path d="M0,-9 L6,8 L0,4 L-6,8 Z" class="acsym"/></svg>`)}
+          ${sw("traffic-detail", "etykiety z FL, typem i GS")}
+          <div class="traffic-info hint"></div>
+          <div class="flight" style="display:none"></div>
+        </section>
+        <section class="ms-card">
+          <h4>Trasa</h4>
+          <textarea class="field route" rows="3" placeholder="np. EPKK OKENO N871 POLON L980 VAMPU EPGD"></textarea>
+          <div class="ms-row"><button class="btn primary show-route">Pokaż trasę</button><button class="btn clear-route">Wyczyść</button></div>
+          <div class="route-info hint"></div>
+        </section>
+        <section class="ms-card">
+          <h4>Przestrzeń</h4>
+          <div class="ms-row"><label class="hint">Poziom</label><span class="flbox">FL<input type="number" class="field fl" value="300" min="0" max="660" step="5"></span></div>
+          ${sw("sectors", "sektory EPWW", true, `<span class="swatch sec"></span>`)}
+          ${sw("online", "aktualna sektoryzacja (kto jest online)", true, `<span class="swatch on"></span>`)}
+          ${sw("firs", "FIR-y sąsiednie (VATSpy)", true, `<span class="swatch fir"></span>`)}
+          <div class="sector-info hint"></div>
+        </section>
+        <section class="ms-card">
+          <h4>Punkty i drogi</h4>
+          ${sw("ads", "lotniska", true, `<i data-sym="aerodrome"></i>`)}
+          ${sw("navaids", "VOR / DME", true, `<i data-sym="vor"></i>`)}
+          ${sw("ndbs", "NDB", true, `<i data-sym="ndb"></i>`)}
+          ${sw("vfrs", "punkty VFR <small>(zoom ≥ 8)</small>", false, `<i data-sym="vfr"></i>`)}
+          ${sw("fixes", "punkty FIX <small>(zoom ≥ 8)</small>", false, `<i data-sym="fix"></i>`)}
+          ${sw("airways", "drogi lotnicze <small>(zoom ≥ 7)</small>", false, `<span class="swatch awy"></span>`)}
+          ${sw("labels", "nazwy punktów", true)}
+        </section>
+        <section class="ms-card">
+          <h4>Podkład</h4>
+          <div class="seg">${[["dark", "ciemny"], ["light", "jasny"], ["white", "biały"], ["osm", "OSM"]]
+            .map(([v, l]) => `<button data-base="${v}" class="${v === "dark" ? "on" : ""}">${l}</button>`).join("")}</div>
+          ${sw("openaip", "nakładka lotnicza OpenAIP")}
+          <div class="hint openaip-note"></div>
+        </section>
+        <section class="ms-card legend">
+          <h4>Legenda</h4>
+          <div class="lg"><span class="lg-line lg-flight"></span>trasa wybranego samolotu</div>
+          <div class="lg"><span class="lg-line lg-route"></span>trasa wpisana ręcznie</div>
+          <div class="lg"><span class="swatch on"></span>sektor / FIR obsadzony (online)</div>
+          <div class="lg"><span class="swatch unicom"></span>sektor bez kontrolera (UNICOM 122.800)</div>
+          <div class="lg"><span class="lg-freq">133.475</span>częstotliwość obsadzonego sektora</div>
+          <p class="hint">Oficjalna mapa sektorów: <a href="${esc(ctx.config.links.sectors)}" target="_blank" rel="noopener">plvacc.pl/acc-sectors ↗</a></p>
+        </section>
       </div>
+      <button class="btn ms-show" title="Pokaż panel">»</button>
       <div class="map"></div>
     </div></div>`);
     root.append(pane);
     const $ = (s) => pane.querySelector(s);
-    const map = L.map($(".map"), { preferCanvas: true }).setView([52.0, 19.3], 6);
-    let base = BASEMAPS.dark(L).addTo(map);
+    const mapEl = $(".map");
+    const map = L.map(mapEl, { preferCanvas: true, zoomSnap: 0.5 }).setView([52.0, 19.3], 6);
+    const key = ctx.config.carto_api_key;
+    let baseName = localStorage.getItem("map.base") || "dark";
+    let base = null;
+    let theme = THEME.dark;
     const layers = {
-      sectors: L.layerGroup().addTo(map), airways: L.layerGroup(), navaids: L.layerGroup().addTo(map),
-      fixes: L.layerGroup(), ads: L.layerGroup().addTo(map), route: L.layerGroup().addTo(map),
-      firs: L.layerGroup().addTo(map), traffic: L.layerGroup().addTo(map), flight: L.layerGroup().addTo(map),
+      firs: L.layerGroup().addTo(map), sectors: L.layerGroup().addTo(map), airways: L.layerGroup(),
+      ads: L.layerGroup().addTo(map), points: L.layerGroup().addTo(map), route: L.layerGroup().addTo(map),
+      traffic: L.layerGroup().addTo(map), flight: L.layerGroup().addTo(map),
     };
-    layers.firs.setZIndex?.(0);
     let openaip = null;
 
-    pane.querySelectorAll("input[name=base]").forEach((r) => r.addEventListener("change", () => {
-      map.removeLayer(base);
-      base = BASEMAPS[r.value](L).addTo(map);
-      base.bringToBack();
-    }));
+    const paintLegend = () => pane.querySelectorAll("i[data-sym]").forEach((i) => {
+      i.outerHTML = `<i data-sym="${i.dataset.sym}">${symbolSvg(i.dataset.sym, THEME.dark[KIND_COLOR[i.dataset.sym]])}</i>`;
+    });
+    paintLegend();
+
+    const setBase = (name) => {
+      baseName = BASEMAPS[name] ? name : "dark";
+      try { localStorage.setItem("map.base", baseName); } catch { /* tryb prywatny */ }
+      if (base) map.removeLayer(base);
+      base = BASEMAPS[baseName](L, key).addTo(map);
+      base.bringToBack?.();
+      const light = LIGHT_BASEMAPS.includes(baseName);
+      theme = light ? THEME.light : THEME.dark;
+      mapEl.classList.toggle("light", light);
+      mapEl.classList.toggle("white", baseName === "white");
+      pane.querySelectorAll(".seg button").forEach((b) => b.classList.toggle("on", b.dataset.base === baseName));
+      drawAds(); loadVisible(); redrawFlight(); redrawRoute();
+    };
+    $(".seg").addEventListener("click", (e) => { const b = e.target.closest("button[data-base]"); if (b) setBase(b.dataset.base); });
     $(".openaip").addEventListener("change", (e) => {
-      const key = ctx.config.openaip_api_key;
-      if (!key) {
+      const k = ctx.config.openaip_api_key;
+      if (!k) {
         e.target.checked = false;
         $(".openaip-note").textContent = "Brak klucza: załóż darmowe konto na openaip.net i wpisz VPANDORA_OPENAIP_API_KEY w pliku .env";
         return;
       }
       if (e.target.checked) {
-        openaip = L.tileLayer(`https://api.tiles.openaip.net/api/data/openaip/{z}/{x}/{y}.png?apiKey=${encodeURIComponent(key)}`,
+        openaip = L.tileLayer(`https://api.tiles.openaip.net/api/data/openaip/{z}/{x}/{y}.png?apiKey=${encodeURIComponent(k)}`,
           { attribution: "© openAIP", maxZoom: 14, opacity: 0.9 }).addTo(map);
       } else if (openaip) { map.removeLayer(openaip); }
     });
+    $(".ms-hide").addEventListener("click", () => { pane.querySelector(".mapwrap").classList.add("collapsed"); setTimeout(() => map.invalidateSize(), 50); });
+    $(".ms-show").addEventListener("click", () => { pane.querySelector(".mapwrap").classList.remove("collapsed"); setTimeout(() => map.invalidateSize(), 50); });
+
+    // Punkt jako symbol EuroScope z nazwą obok
+    const pointMarker = (p, { color, label = true, scale = 1.6, weight = 1.6, permanent = true, cls = "lbl", popup = true } = {}) => {
+      const sym = symbolFor(p.kind);
+      const m = new SymbolMarker([p.lat, p.lon], { symbol: sym, color: color || theme[KIND_COLOR[sym]], scale, weight, radius: 7 * scale / 1.6 });
+      const full = `${esc(p.ident)} ${esc(p.kind)}${p.frequency ? " " + esc(p.frequency) : ""}${p.name ? " " + esc(p.name) : ""}`;
+      if (label) m.bindTooltip(esc(p.ident), { permanent, direction: "right", offset: [6 * scale / 1.6, 0], className: cls });
+      else m.bindTooltip(full);
+      if (label && popup) m.bindPopup(full);
+      return m;
+    };
 
     // --- lotniska
-    api("/api/aerodromes").then((ads) => ads.filter((a) => a.kind !== "small_airport" || a.icao.startsWith("EP")).forEach((a) => {
-      L.circleMarker([a.lat, a.lon], { radius: a.kind === "large_airport" ? 6 : 4, color: "#fff", weight: 1, fillColor: "#2f8fff", fillOpacity: 0.9 })
-        .bindTooltip(`${a.icao} ${esc(a.name)}`).on("click", () => ctx.open("aerodrome", a.icao)).addTo(layers.ads);
-    }));
+    let ads = [];
+    const drawAds = () => {
+      layers.ads.clearLayers();
+      const z = map.getZoom();
+      ads.forEach((a) => {
+        const big = a.kind === "large_airport" || a.kind === "medium_airport";
+        if (!big && z < 8) return;
+        pointMarker({ ident: a.icao, kind: "AD", lat: a.lat, lon: a.lon, name: a.name },
+          { label: z >= 7 || (big && z >= 6), permanent: true, scale: big ? 1.8 : 1.4, popup: false })
+          .on("click", () => ctx.open("aerodrome", a.icao)).addTo(layers.ads);
+      });
+    };
+    api("/api/aerodromes").then((list) => {
+      ads = list.filter((a) => a.kind !== "small_airport" || a.icao.startsWith("EP"));
+      drawAds();
+    });
+    $(".ads").addEventListener("change", (e) => (e.target.checked ? layers.ads.addTo(map) : map.removeLayer(layers.ads)));
 
     // --- sektory EPWW i FIR-y sąsiednie, podświetlone wg zalogowanych kontrolerów
     const loadSectors = async () => {
@@ -94,10 +170,33 @@ export default {
     $(".fl").addEventListener("change", loadSectors);
     setInterval(() => document.body.contains(pane) && loadSectors(), 60000);
 
+    // --- trasa: gruba linia z obwódką (czytelna na każdym podkładzie), punkty jako symbole z nazwą w ramce
+    const drawRoute = (layer, pts, color) => {
+      const ll = pts.map((p) => [p.lat, p.lon]);
+      L.polyline(ll, { color: theme.halo, weight: 9, opacity: 0.85, lineJoin: "round", interactive: false }).addTo(layer);
+      const line = L.polyline(ll, { color, weight: 4, opacity: 1, lineJoin: "round" }).addTo(layer);
+      pts.forEach((p, i) => {
+        const first = i === 0 || i === pts.length - 1;
+        pointMarker(p, { color, scale: first ? 2.2 : 1.9, weight: 2.4, cls: "rtlbl" }).addTo(layer);
+      });
+      return line;
+    };
+    let route = null;
+    const redrawRoute = () => {
+      layers.route.clearLayers();
+      if (route) drawRoute(layers.route, route.points, theme.route);
+    };
+
     // --- samoloty z VATSIM; kliknięcie pokazuje plan lotu i trasę
-    let selected = null;
+    let selected = null, flight = null;
+    const redrawFlight = () => {
+      layers.flight.clearLayers();
+      if (!flight) return;
+      if (flight.points.length) drawRoute(layers.flight, flight.points, theme.flight);
+    };
     const showFlight = async (cs) => {
       selected = cs;
+      flight = null;
       layers.flight.clearLayers();
       const box = $(".flight");
       box.style.display = "";
@@ -105,24 +204,26 @@ export default {
       try {
         const f = await api(`/api/vatsim/pilots/${encodeURIComponent(cs)}/route`);
         if (selected !== cs) return;
-        if (f.points.length) {
-          const line = L.polyline(f.points.map((p) => [p.lat, p.lon]), { color: "#ffb020", weight: 2, dashArray: "6 4" }).addTo(layers.flight);
-          f.points.forEach((p) => L.circleMarker([p.lat, p.lon], { radius: 3, color: "#ffb020", fillOpacity: 1 })
-            .bindTooltip(p.ident, { permanent: map.getZoom() >= 7, direction: "top", className: "lbl" }).addTo(layers.flight));
-          map.fitBounds(line.getBounds(), { padding: [40, 40], maxZoom: 9 });
-        }
-        box.innerHTML = `<b class="mono" style="font-size:16px">${esc(f.callsign)}</b> <span class="hint">${esc(f.name || "")} (${esc(f.cid)})</span>
-          <button class="btn close-flight" style="float:right;padding:0 6px">✕</button><br>
-          <span class="mono">${esc(f.aircraft || "–")} · ${esc(f.departure || "?")} → ${esc(f.arrival || "?")} · RFL ${esc(f.rfl || "–")}</span><br>
-          <span class="mono">${fl(f.altitude)} · GS ${esc(f.groundspeed)} kt · SQ ${esc(f.squawk || "–")} · ${f.rules === "V" ? "VFR" : "IFR"}</span>
-          <div class="mono hint" style="margin-top:4px">${esc(f.route || "brak trasy")}</div>
+        flight = f;
+        redrawFlight();
+        if (f.points.length) map.fitBounds(L.latLngBounds(f.points.map((p) => [p.lat, p.lon])), { padding: [50, 50], maxZoom: 9 });
+        else if (f.lat !== null && f.lat !== undefined) map.setView([f.lat, f.lon], Math.max(map.getZoom(), 8));
+        box.innerHTML = `<div class="fl-head"><b>${esc(f.callsign)}</b><span class="hint">${esc(f.name || "")} · ${esc(f.cid)}</span>
+            <button class="btn close-flight" title="Zamknij">✕</button></div>
+          <div class="fl-grid">
+            <span>Typ</span><b>${esc(f.aircraft || "–")}</b><span>Reguły</span><b>${f.rules === "V" ? "VFR" : "IFR"}</b>
+            <span>Z</span><b>${esc(f.departure || "?")}</b><span>Do</span><b>${esc(f.arrival || "?")}</b>
+            <span>Poziom</span><b>${fl(f.altitude)}</b><span>RFL</span><b>${esc(f.rfl || "–")}</b>
+            <span>GS</span><b>${esc(f.groundspeed ?? "–")} kt</b><span>SQ</span><b>${esc(f.squawk || "–")}</b>
+          </div>
+          <div class="fl-route mono">${esc(f.route || "brak trasy")}</div>
           ${f.points.length ? `<div class="hint">${f.points.length} punktów · ${f.distance_nm} NM</div>` : ""}
           ${f.warnings.length ? `<div class="hint" style="color:var(--warn)">${f.warnings.map(esc).join("<br>")}</div>` : ""}`;
       } catch (e) { box.innerHTML = `<span class="error">${esc(e.message)}</span> <button class="btn close-flight">✕</button>`; }
     };
     $(".flight").addEventListener("click", (e) => {
       if (!e.target.closest(".close-flight")) return;
-      selected = null; layers.flight.clearLayers(); $(".flight").style.display = "none";
+      selected = null; flight = null; layers.flight.clearLayers(); $(".flight").style.display = "none";
     });
     let pilots = [];
     const drawTraffic = () => {
@@ -130,9 +231,10 @@ export default {
       if (!$(".traffic").checked) return;
       const z = map.getZoom(), b = map.getBounds().pad(0.2);
       pilots.filter((p) => b.contains([p.lat, p.lon])).forEach((p) => {
-        aircraftMarker(p, { label: z >= 6, detail: $(".traffic-detail").checked || z >= 9 })
+        const m = aircraftMarker(p, { label: z >= 6, detail: $(".traffic-detail").checked || z >= 9 })
           .bindTooltip(`${esc(p.callsign)} ${esc(p.aircraft || "")} ${esc(p.departure || "")}→${esc(p.arrival || "")} ${fl(p.altitude)}`)
           .on("click", () => showFlight(p.callsign)).addTo(layers.traffic);
+        if (p.callsign === selected) m.getElement()?.classList.add("sel");
       });
     };
     const loadTraffic = async () => {
@@ -150,62 +252,57 @@ export default {
 
     // --- punkty i drogi w widocznym obszarze
     const bbox = () => { const b = map.getBounds(); return [b.getSouth(), b.getWest(), b.getNorth(), b.getEast()].map((x) => x.toFixed(3)).join(","); };
+    let seq = 0;
     const loadVisible = async () => {
-      const z = map.getZoom();
-      for (const [cls, kinds, minZoom] of [["navaids", "VOR,NDB,VOR-DME,DME,VORTAC,NDB-DME,TACAN", 5], ["fixes", "FIX", 8]]) {
-        layers[cls].clearLayers();
-        if (!$("." + cls).checked) { map.removeLayer(layers[cls]); continue; }
-        layers[cls].addTo(map);
-        if (z < minZoom) continue;
-        try {
-          const pts = await api(`/api/nav/points?bbox=${bbox()}&kinds=${kinds}`);
-          pts.forEach((p) => {
-            const isNav = cls === "navaids";
-            const m = isNav
-              ? L.circleMarker([p.lat, p.lon], { radius: 4, color: "#3ecf6e", weight: 2, fill: false })
-              : L.circleMarker([p.lat, p.lon], { radius: 2, color: "#9aa4af", weight: 1 });
-            const full = `${p.ident} ${p.kind}${p.frequency ? " " + p.frequency : ""}${p.name ? " " + esc(p.name) : ""}`;
-            if ((isNav && z >= 8) || z >= 9) m.bindTooltip(full, { permanent: true, direction: "right", className: "lbl" });
-            else if (isNav) m.bindTooltip(p.ident, { permanent: true, direction: "right", className: "lbl" }).bindPopup(full);
-            else m.bindTooltip(full);
-            m.addTo(layers[cls]);
-          });
-        } catch { /* zbyt duży obszar */ }
-      }
+      const z = map.getZoom(), my = ++seq;
+      const kinds = [];
+      if ($(".navaids").checked && z >= 5) kinds.push("VOR", "VOR-DME", "DME", "VORTAC");
+      if ($(".ndbs").checked && z >= 5) kinds.push("NDB", "NDB-DME");
+      if ($(".vfrs").checked && z >= 8) kinds.push("VFR");
+      if ($(".fixes").checked && z >= 8) kinds.push("FIX");
+      let pts = [], segs = [];
+      try { if (kinds.length) pts = await api(`/api/nav/points?bbox=${bbox()}&kinds=${kinds.join(",")}`); } catch { /* zbyt duży obszar */ }
+      try { if ($(".airways").checked && z >= 7) segs = await api(`/api/nav/airways?bbox=${bbox()}`); } catch { /* zbyt duży obszar */ }
+      if (my !== seq) return;
+      layers.points.clearLayers();
       layers.airways.clearLayers();
-      if ($(".airways").checked) {
-        layers.airways.addTo(map);
-        if (z >= 7) {
-          try {
-            const segs = await api(`/api/nav/airways?bbox=${bbox()}`);
-            segs.forEach((s) => L.polyline(s.coords, { color: "#5f6b78", weight: 1 }).bindTooltip(s.airway).addTo(layers.airways));
-          } catch { /* zbyt duży obszar */ }
-        }
-      } else map.removeLayer(layers.airways);
+      if ($(".airways").checked) layers.airways.addTo(map); else map.removeLayer(layers.airways);
+      segs.forEach((s) => L.polyline(s.coords, { color: theme.airway, weight: 1 }).bindTooltip(esc(s.airway)).addTo(layers.airways));
+      const labels = $(".labels").checked;
+      pts.forEach((p) => {
+        const nav = p.kind !== "FIX" && p.kind !== "VFR";
+        const vor = symbolFor(p.kind) === "vor";
+        pointMarker(p, { label: labels && (vor ? z >= 6 : nav ? z >= 7 : z >= 9), scale: nav ? 1.7 : 1.4 }).addTo(layers.points);
+      });
     };
     map.on("moveend", loadVisible);
-    ["navaids", "fixes", "airways"].forEach((c) => $("." + c).addEventListener("change", loadVisible));
-    $(".ads").addEventListener("change", (e) => (e.target.checked ? layers.ads.addTo(map) : map.removeLayer(layers.ads)));
+    map.on("zoomend", drawAds);
+    ["navaids", "ndbs", "vfrs", "fixes", "airways", "labels"].forEach((c) => $("." + c).addEventListener("change", loadVisible));
 
-    // --- trasa
+    // --- trasa wpisana ręcznie
     $(".show-route").addEventListener("click", async () => {
-      layers.route.clearLayers();
       const info = $(".route-info");
       try {
         const r = await api(`/api/nav/route?route=${encodeURIComponent($(".route").value)}`);
         if (!r.points.length) { info.innerHTML = `<span class="error">Nie rozpoznano żadnego punktu.</span>`; return; }
-        const line = L.polyline(r.points.map((p) => [p.lat, p.lon]), { color: "#ff4dd2", weight: 3 }).addTo(layers.route);
-        r.points.forEach((p) => L.circleMarker([p.lat, p.lon], { radius: 4, color: "#ff4dd2", fillOpacity: 1 })
-          .bindTooltip(`${p.ident}${p.via ? " (" + p.via + ")" : ""}`, { permanent: true, direction: "top", className: "lbl" }).addTo(layers.route));
-        map.fitBounds(line.getBounds(), { padding: [30, 30] });
-        info.innerHTML = `${r.points.length} punktów · ${r.distance_nm} NM<br>${r.points.map((p) => p.ident).join(" ")}` +
+        route = r;
+        redrawRoute();
+        map.fitBounds(L.latLngBounds(r.points.map((p) => [p.lat, p.lon])), { padding: [40, 40] });
+        info.innerHTML = `${r.points.length} punktów · ${r.distance_nm} NM<br><span class="mono">${r.points.map((p) => esc(p.ident)).join(" ")}</span>` +
           (r.warnings.length ? `<div class="error">${r.warnings.map(esc).join("<br>")}</div>` : "");
       } catch (e) { info.innerHTML = `<span class="error">${esc(e.message)}</span>`; }
     });
-    $(".clear-route").addEventListener("click", () => { layers.route.clearLayers(); $(".route-info").textContent = ""; });
+    $(".clear-route").addEventListener("click", () => { route = null; layers.route.clearLayers(); $(".route-info").textContent = ""; });
 
+    setBase(baseName);
     loadSectors();
     loadTraffic();
-    return { activate: () => setTimeout(() => { map.invalidateSize(); loadVisible(); }, 50) };
+    return {
+      activate: (arg) => setTimeout(() => {
+        map.invalidateSize();
+        loadVisible();
+        if (arg && arg !== selected) showFlight(decodeURIComponent(arg));
+      }, 50),
+    };
   },
 };

@@ -1,11 +1,14 @@
 import json
+from functools import lru_cache
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from ..config import settings
+from ..config import DATA_DIR, settings
 from ..database import get_db
+from ..importers.ese import parse_vfr_points
+from ..importers.sct import read_text
 from ..models import AirwaySegment, AtcPosition, NavPoint, Sector
 from ..services.http_cache import UpstreamError
 from ..services.route import RouteResolver
@@ -28,21 +31,45 @@ def _bbox(bbox: str):
     return s, w, n, e
 
 
+@lru_cache(maxsize=1)
+def vfr_points() -> list[dict]:
+    out = []
+    for f in sorted((DATA_DIR / "import").glob("*.ese")):
+        out += parse_vfr_points(read_text(f))
+    return out
+
+
 @router.get("/points")
 def points(bbox: str, kinds: str = "VOR,NDB,VOR-DME,DME,VORTAC,NDB-DME,FIX", limit: int = 3000,
            db: Session = Depends(get_db)):
+    """Punkty nawigacyjne w obszarze. Rodzaj VFR = punkty meldowania VFR z pliku .ese (sekcja FREETEXT)."""
     s, w, n, e = _bbox(bbox)
+    if "VFR" in kinds.split(","):
+        vfr = [p for p in vfr_points() if s <= p["lat"] <= n and w <= p["lon"] <= e]
+        rest = ",".join(k for k in kinds.split(",") if k != "VFR")
+        return vfr + (points(bbox, rest, limit, db) if rest else [])
     stmt = (select(NavPoint)
             .where(NavPoint.lat.between(s, n), NavPoint.lon.between(w, e), NavPoint.kind.in_(kinds.split(",")))
             .limit(limit))
-    seen, out = set(), []
-    for p in db.scalars(stmt):
-        key = (p.ident, round(p.lat, 1), round(p.lon, 1))  # ten sam punkt z kilku źródeł
-        if key in seen:
+    # Ten sam punkt bywa w kilku źródłach (np. NDB "NO" z pliku .sct i "N" z OurAirports w tym samym miejscu).
+    # Pierwszeństwo ma plik sektorowy (aktualny AIRAC), brakującą nazwę/częstotliwość bierzemy z OurAirports.
+    prio = {"sct": 0, "ourairports": 1}
+    family = lambda k: "NDB" if "NDB" in k else "VOR" if k in ("VOR", "VOR-DME", "DME", "VORTAC") else k  # noqa: E731
+    seen: dict[tuple, dict] = {}
+    out = []
+    for p in sorted(db.scalars(stmt), key=lambda p: prio.get(p.source, 2)):
+        keys = [(p.ident, round(p.lat, 1), round(p.lon, 1))]
+        if family(p.kind) in ("VOR", "NDB"):
+            keys.append((family(p.kind), round(p.lat, 2), round(p.lon, 2)))
+        hit = next((seen[k] for k in keys if k in seen), None)
+        if hit:
+            hit["name"] = hit["name"] or p.name
+            hit["frequency"] = hit["frequency"] or p.frequency
             continue
-        seen.add(key)
-        out.append({"ident": p.ident, "kind": p.kind, "name": p.name, "frequency": p.frequency,
-                    "lat": p.lat, "lon": p.lon})
+        item = {"ident": p.ident, "kind": p.kind, "name": p.name, "frequency": p.frequency, "lat": p.lat, "lon": p.lon}
+        for k in keys:
+            seen[k] = item
+        out.append(item)
     return out
 
 

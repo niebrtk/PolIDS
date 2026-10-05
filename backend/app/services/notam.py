@@ -1,6 +1,7 @@
 """NOTAM-y z serwera PL vACC (cv.plvacc.pl) w formacie ICAO."""
 
 import re
+from datetime import datetime, timezone
 
 from ..config import settings
 from .http_cache import fetch_text
@@ -30,8 +31,27 @@ def split_notams(text: str) -> list[dict]:
         pieces = FIELD.split(p)
         for key, val in zip(pieces[1::2], pieces[2::2]):
             fields[key] = val.strip().rstrip(")").strip()
-        out.append({"id": ident.group(1) if ident else None, "raw": p, "fields": fields})
+        out.append({"id": ident.group(1) if ident else None, "raw": p, "fields": fields, **validity(fields)})
     return out
+
+
+def notam_time(v: str | None) -> datetime | None:
+    """Pole B)/C) w formacie RRMMDDggmm (UTC)."""
+    m = re.match(r"\s*(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})", v or "")
+    if not m:
+        return None
+    try:
+        return datetime(2000 + int(m[1]), int(m[2]), int(m[3]), int(m[4]), int(m[5]), tzinfo=timezone.utc)
+    except ValueError:
+        return None
+
+
+def validity(fields: dict) -> dict:
+    """Okres ważności: start (B), koniec (C), PERM, EST (szacowany koniec) i harmonogram (D)."""
+    c = (fields.get("C") or "").upper()
+    start, end = notam_time(fields.get("B")), notam_time(c)
+    return {"start": start.isoformat() if start else None, "end": end.isoformat() if end else None,
+            "perm": "PERM" in c, "est": "EST" in c, "schedule": fields.get("D") or None}
 
 
 def for_aerodrome(notams: list[dict], icao: str) -> list[dict]:

@@ -4,19 +4,24 @@ const RECAT = {
   A: "Super Heavy", B: "Upper Heavy", C: "Lower Heavy", D: "Upper Medium", E: "Lower Medium", F: "Light",
 };
 const searchName = (a) => `${a.manufacturer || ""} ${a.model || a.icao}`.trim();
+// EUROCONTROL Aircraft Performance Database: strona typu (details.aspx?ICAO=…) obok strony głównej z config
+let PERF = "https://learningzone.eurocontrol.int/ilp/customs/ATCPFDB/default.aspx";
+const perfUrl = (icao) => PERF.replace(/default\.aspx.*$/i, `details.aspx?ICAO=${encodeURIComponent(icao)}`);
 
 // Rekord w dwóch liniach: kod ICAO duży po lewej, reszta jednolitą czcionką
 function record(a, i) {
   return `<div class="ac-rec" data-i="${i}">
     <div class="ac-icao">${esc(a.icao)}</div>
-    <div class="ac-l1">${esc(a.manufacturer || "")} ${esc(a.model)}</div>
+    <div class="ac-l1">${esc(a.manufacturer || "")} ${esc(a.model)}
+      <a class="perf" href="${esc(perfUrl(a.icao))}" target="_blank" rel="noopener" title="EUROCONTROL Aircraft Performance Database">osiągi ↗</a></div>
     <div class="ac-l2">WTC <b>${esc(a.wtc || "–")}</b> · RECAT-EU <b class="recat-${esc(a.recat)}">${esc(a.recat || "–")}</b>
       · rozp. ${fmt(a.wingspan, 1, " m")} · dł. ${fmt(a.length, 1, " m")} · wys. ${fmt(a.height, 1, " m")} · MTOW ${a.mtow ? Math.round(a.mtow / 100) / 10 + " t" : "–"}</div>
   </div>`;
 }
 
 export default {
-  mount(root) {
+  mount(root, ctx) {
+    PERF = ctx.config.links?.performance_db || PERF;
     let prefix = "";
     const letters = letterMenu(root, (l) => { prefix = l; load(); });
     const pane = h(`<div class="pane"><div class="split">
@@ -52,6 +57,8 @@ export default {
     const show = (a) => {
       $(".detail").innerHTML = `<div class="card">
         <h3><span class="ac-icao" style="font-size:26px">${esc(a.icao)}</span> ${esc(a.manufacturer)} ${esc(a.model)}</h3>
+        <div class="perf-links"><a class="btn" href="${esc(perfUrl(a.icao))}" target="_blank" rel="noopener">EUROCONTROL Aircraft Performance: ${esc(a.icao)} ↗</a>
+          <a class="hint" href="${esc(PERF)}" target="_blank" rel="noopener">wyszukiwarka bazy ↗</a></div>
         <div class="photo-box"><span class="hint">Ładowanie zdjęcia…</span></div>
         <dl class="props">
           <dt>WTC (ICAO)</dt><dd>${esc(a.wtc || "–")}</dd>

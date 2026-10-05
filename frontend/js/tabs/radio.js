@@ -1,4 +1,4 @@
-import { api, atcPositions, esc, h, hhmm, positionTip, subtabs, vatsimBookings, vatsimOnline } from "../api.js";
+import { aerodromeNames, api, atcPositions, esc, hhmm, positionTip, subtabs, vatsimBookings, vatsimOnline } from "../api.js";
 import { drawFirs, drawSectors, loadFirs, sectorOwners } from "../airspace.js";
 
 const TYPE_ORDER = ["CTR", "FSS", "APP", "DEP", "TWR", "GND", "DEL", "ATIS"];
@@ -20,14 +20,18 @@ const NEIGHBOURS = [
 const isOther = (p) => !p.startsWith("EP") && !NEIGHBOURS.some((n) => n.test(p));
 
 const typeOf = (cs) => cs.split("_").pop();
-// częstotliwości FIS (Information) przenosimy do EPWW ACC; informacje lotniskowe (EPBC, EPML) zostają przy lotniskach
-const isFis = (p) => /information/i.test(p.name) && /_(APP|CTR)$/.test(p.callsign);
+// polskie częstotliwości FIS (Warszawa Information) przenosimy do EPWW ACC; informacje lotniskowe (EPBC, EPML)
+// zostają przy lotniskach, a FIS sąsiadów (Sweden, Kaunas, Kaliningrad Information) w zakładkach ich FIR-ów
+const isFis = (p) => p.callsign.startsWith("EP") && /information/i.test(p.name) && /_(APP|CTR)$/.test(p.callsign);
 const byType = (a, b) => TYPE_ORDER.indexOf(typeOf(a.callsign)) - TYPE_ORDER.indexOf(typeOf(b.callsign)) || a.callsign.localeCompare(b.callsign);
+const isAcc = (p) => ["CTR", "FSS"].includes(typeOf(p.callsign));
 
-function group(list, keyFn) {
+// Grupy wg prefiksu; z ctrFirst najpierw grupy ze stanowiskami ACC/CTR, potem lotniska (APP, TWR…)
+function group(list, keyFn, { ctrFirst = false } = {}) {
   const g = {};
   list.forEach((p) => (g[keyFn(p)] ||= []).push(p));
-  return Object.entries(g).sort(([a], [b]) => a.localeCompare(b)).map(([k, ps]) => [k, ps.sort(byType)]);
+  const rank = (ps) => (ctrFirst && ps.some(isAcc) ? 0 : 1);
+  return Object.entries(g).sort(([a, pa], [b, pb]) => rank(pa) - rank(pb) || a.localeCompare(b)).map(([k, ps]) => [k, ps.sort(byType)]);
 }
 
 // Stan sieci wspólny dla wszystkich podzakładek: {online: {callsign: kontroler}, bookings: {callsign: [...]}}
@@ -49,21 +53,23 @@ function row(p) {
   const tip = positionTip(on, books);
   const who = on ? `<b class="who">${esc(on.name || on.callsign)}</b>` : books.length ? `<span class="booked-txt">booking ${hhmm(books[0].start)}–${hhmm(books[0].end)}</span>` : "";
   return `<div class="radio-row ${cls}" ${tip ? `data-tip="${esc(tip)}"` : ""}><span class="freq ${cls}">${esc(p.frequency)}</span>
-    <span class="cs">${esc(p.callsign)}</span><span class="nm">${esc(p.name)}</span>${who}</div>`;
+    <span class="pid">${esc(p.position_id || "")}</span><span class="cs">${esc(p.callsign)}</span><span class="nm">${esc(p.name)}</span>${who}</div>`;
 }
 
+let names = {};
 function groupsHtml(groups, empty = "Brak stanowisk.") {
-  return groups.length ? groups.map(([name, ps]) => `<div class="radio-group"><h3>${esc(name)}</h3>${ps.map(row).join("")}</div>`).join("")
+  return groups.length ? groups.map(([name, ps]) => `<div class="radio-group"><h3>${esc(name)}${names[name] ? ` <small>${esc(names[name])}</small>` : ""}</h3>${ps.map(row).join("")}</div>`).join("")
     : `<p class="hint">${esc(empty)}</p>`;
 }
 
-// Widok listy, odświeżany razem ze stanem sieci
-function listView(build) {
+// Widok listy, odświeżany razem ze stanem sieci. single = jedna kolumna z większym tekstem (LOTNISKA, sąsiedzi).
+function listView(build, { single = true } = {}) {
   return (pane) => {
-    pane.innerHTML = `<div class="netstatus hint"></div><div class="body"><p class="hint">Ładowanie…</p></div>`;
+    pane.innerHTML = `<div class="netstatus hint"></div><div class="body radio-list ${single ? "single" : ""}"><p class="hint">Ładowanie…</p></div>`;
     const draw = async () => {
       try {
-        const ps = await atcPositions();
+        const [ps, n] = await Promise.all([atcPositions(), aerodromeNames().catch(() => ({}))]);
+        names = n;
         pane.querySelector(".body").innerHTML = build(ps);
         pane.querySelector(".netstatus").innerHTML = st.msg;
       } catch (e) { pane.querySelector(".body").innerHTML = `<p class="error">${esc(e.message)}</p>`; }
@@ -142,9 +148,9 @@ export default {
       { id: "ad", label: "LOTNISKA", render: listView(aerodromes) },
       { sep: true },
       ...NEIGHBOURS.map((n) => ({ id: n.id, label: n.label, render: listView((ps) =>
-        `<h2 class="radio-section">${esc(n.title)}</h2>` + groupsHtml(group(ps.filter((p) => p.prefix && n.test(p.prefix)), (p) => p.prefix))) })),
+        `<h2 class="radio-section">${esc(n.title)}</h2>` + groupsHtml(group(ps.filter((p) => p.prefix && n.test(p.prefix)), (p) => p.prefix, { ctrFirst: true }))) })),
       { id: "other", label: "INNE", render: listView((ps) =>
-        `<h2 class="radio-section">Pozostałe (UIR, Eurocontrol)</h2>` + groupsHtml(group(ps.filter((p) => p.prefix && isOther(p.prefix)), (p) => p.prefix))) },
+        `<h2 class="radio-section">Pozostałe (UIR, Eurocontrol)</h2>` + groupsHtml(group(ps.filter((p) => p.prefix && isOther(p.prefix)), (p) => p.prefix, { ctrFirst: true }))) },
       { sep: true },
       { id: "online", label: "ONLINE", render: listView((ps) => {
         const list = ps.filter((p) => st.online[p.callsign] || st.bookings[p.callsign]);
@@ -153,7 +159,7 @@ export default {
         const extra = (st.onlineRaw?.controllers || []).filter((c) => !known.has(c.callsign) && !c.callsign.endsWith("_OBS"))
           .map((c) => ({ callsign: c.callsign, name: "(spoza pliku .ese)", frequency: c.frequency, prefix: c.callsign.split("_")[0], _on: c }));
         extra.forEach((p) => { st.online[p.callsign] ||= p._on; });
-        return groupsHtml(group([...list, ...extra], (p) => p.prefix), "Nikt z EPWW ani sąsiadów nie jest teraz online i nie ma rezerwacji na najbliższe 24 h.");
+        return groupsHtml(group([...list, ...extra], (p) => p.prefix, { ctrFirst: true }), "Nikt z EPWW ani sąsiadów nie jest teraz online i nie ma rezerwacji na dziś.");
       }) },
     ]);
   },

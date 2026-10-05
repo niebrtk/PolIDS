@@ -77,12 +77,16 @@ export function iframeWithFallback(pane, url, note = "") {
   pane.append(h(`<iframe class="embed" src="${esc(url)}" referrerpolicy="no-referrer"></iframe>`));
 }
 
+// Podkłady mapy. Klucz CARTO (opcjonalny, VPANDORA_CARTO_API_KEY w pliku .env) dokładamy do adresu kafelków;
+// bez klucza podkłady CARTO też działają. "white" = sama biała plansza bez kafelków.
+const carto = (style, key) => `https://{s}.basemaps.cartocdn.com/${style}/{z}/{x}/{y}{r}.png${key ? "?api_key=" + encodeURIComponent(key) : ""}`;
 export const BASEMAPS = {
-  dark: L => L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png", {
-    attribution: "© OpenStreetMap, © CARTO", subdomains: "abcd", maxZoom: 19 }),
-  osm: L => L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    attribution: "© OpenStreetMap", maxZoom: 19 }),
+  dark: (L, key) => L.tileLayer(carto("dark_nolabels", key), { attribution: "© OpenStreetMap, © CARTO", subdomains: "abcd", maxZoom: 19 }),
+  light: (L, key) => L.tileLayer(carto("light_nolabels", key), { attribution: "© OpenStreetMap, © CARTO", subdomains: "abcd", maxZoom: 19 }),
+  white: (L) => L.layerGroup(),
+  osm: (L) => L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { attribution: "© OpenStreetMap", maxZoom: 19 }),
 };
+export const LIGHT_BASEMAPS = ["light", "white", "osm"];
 
 // --- VATSIM: wspólny cache dla wszystkich zakładek (data feed odświeża się co ~15 s, rezerwacje rzadziej)
 const shared = {};
@@ -94,8 +98,10 @@ function cached(key, ttl, fn) {
   return p;
 }
 export const vatsimOnline = () => cached("online", 30000, () => api("/api/vatsim/online"));
-export const vatsimBookings = () => cached("bookings", 300000, () => api("/api/vatsim/bookings?prefix=EP&hours=24"));
+export const vatsimBookings = () => cached("bookings", 300000, () => api("/api/vatsim/bookings?prefix=EP"));
 export const atcPositions = () => cached("positions", 3600000, () => api("/api/nav/positions"));
+export const aerodromeNames = () => cached("adnames", 3600000, () => api("/api/aerodromes")
+  .then((list) => Object.fromEntries(list.map((a) => [a.icao, a.name]))));
 
 export const hhmm = (iso) => (iso ? new Date(iso).toISOString().slice(11, 16) + "Z" : "–");
 

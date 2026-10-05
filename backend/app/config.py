@@ -38,12 +38,15 @@ class Settings(BaseSettings):
     aip_vfr_url: str = "https://docs.pansa.pl/ais/eaipvfr/AIRAC%20AMDT%20VFR%2010-26_2026_10_01/index-v2.html"
     aip_mil_url: str = "https://docs.pansa.pl/ais/eaipmil/AIRAC%20AMDT%20MIL%2010-26_2026_10_01/index-v2.html"
     inop_url: str = "https://om.plvacc.pl/"
-    inop_hide_footer_px: int = 150  # ile pikseli dołu strony INOP zasłonić (czerwona stopka om.plvacc.pl)
     imgw_url: str = "https://awiacja.imgw.pl/"
     sectors_url: str = "https://plvacc.pl/acc-sectors/"
+    phraseology_url: str = "https://learningzone.eurocontrol.int/ilp/pages/mediacontent.jsf?catalogId=230552&mediaId=5453741"
+    performance_db_url: str = "https://learningzone.eurocontrol.int/ilp/customs/ATCPFDB/default.aspx"
 
     # Mapa: podkład lotniczy. OpenAIP wymaga darmowego klucza API (https://www.openaip.net)
     openaip_api_key: str = ""
+    # Klucz CARTO do podkładów mapy (opcjonalny; trzymaj go tylko w lokalnym pliku .env, nie w repozytorium)
+    carto_api_key: str = ""
 
 
 settings = Settings()

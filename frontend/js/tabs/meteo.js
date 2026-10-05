@@ -1,4 +1,4 @@
-import { api, esc, h, iframeWithFallback, splitTaf, subtabs } from "../api.js";
+import { api, esc, h, splitTaf, subtabs } from "../api.js";
 
 const PL_CIV = "EPWA EPMO EPKK EPKT EPGD EPPO EPWR EPLL EPRZ EPLB EPSC EPBY EPSY EPZG EPRA";
 const PL_MIL = "EPCE EPDA EPDE EPIR EPKS EPLK EPLY EPMB EPMI EPMM EPOK EPPR EPPW EPSN EPTM";
@@ -102,7 +102,7 @@ const windy = (overlay) => (pane) => {
 };
 
 export default {
-  mount(root, ctx) {
+  mount(root) {
     subtabs(root, [
       { id: "metar-pl", label: "METAR PL", render: wxList("metar", PL_CIV, "meteo.metar.pl") },
       { id: "metar-mil", label: "METAR MIL", render: wxList("metar", PL_MIL, "meteo.metar.mil") },
@@ -114,9 +114,6 @@ export default {
       { id: "wind", label: "WINDY", fill: true, render: windy("wind") },
       { id: "radar", label: "RADAR", fill: true, render: windy("radar") },
       { id: "sat", label: "SAT EUR", fill: true, render: windy("satellite") },
-      { sep: true },
-      { id: "imgw", label: "IMGW AWIACJA", fill: true,
-        render: (pane) => iframeWithFallback(pane, ctx.config.links.imgw, "GAMET, SIGMET, mapy IMGW") },
     ]);
   },
 };

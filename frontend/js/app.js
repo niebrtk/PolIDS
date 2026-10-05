@@ -10,8 +10,10 @@ import aerodrome from "./tabs/aerodrome.js";
 import map from "./tabs/map.js";
 import inop from "./tabs/inop.js";
 import docs from "./tabs/docs.js";
+import phraseology from "./tabs/phraseology.js";
+import checklist from "./tabs/checklist.js";
 
-const TABS = { about, radio, meteo, aerodrome, adciv, admil, advfr, callsign, aircraft, map, inop, docs, emergency };
+const TABS = { about, radio, meteo, aerodrome, adciv, admil, advfr, callsign, aircraft, map, inop, docs, phraseology, checklist, emergency };
 const views = document.getElementById("views");
 const mounted = {};
 const ctx = { config: null, open };
