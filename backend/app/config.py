@@ -37,6 +37,7 @@ class Settings(BaseSettings):
     aip_vfr_url: str = "https://docs.pansa.pl/ais/eaipvfr/AIRAC%20AMDT%20VFR%2010-26_2026_10_01/index-v2.html"
     aip_mil_url: str = "https://docs.pansa.pl/ais/eaipmil/AIRAC%20AMDT%20MIL%2010-26_2026_10_01/index-v2.html"
     inop_url: str = "https://om.plvacc.pl/"
+    imgw_url: str = "https://awiacja.imgw.pl/"
     sectors_url: str = "https://plvacc.pl/acc-sectors/"
 
     # Mapa: podkład lotniczy. OpenAIP wymaga darmowego klucza API (https://www.openaip.net)
