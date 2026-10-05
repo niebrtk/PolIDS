@@ -49,7 +49,7 @@ def test_meteo_and_qnh(client):
 def test_aircraft_and_callsigns(client):
     a = client.get("/api/aircraft?q=B738").json()
     assert a and a[0]["recat"] == "D" and a[0]["wingspan"] > 30
-    assert client.get("/api/callsigns?q=LOT").json()[0]["telephony"] == "POLLOT"
+    assert client.get("/api/callsigns?q=LOT").json()[0]["icao"] == "LOT"
 
 
 def test_route_without_navdata(client):
