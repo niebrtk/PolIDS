@@ -226,9 +226,11 @@ def test_viff_departure_states_and_sector_load():
     base = {"callsign": "X", "eobt": "1500", "ctot": "", "aobt": "", "atot": "", "atfcmStatus": "", "cdmSts": ""}
     assert departure(base)["state"] == "FI"
     assert departure({**base, "ctot": "1530", "atfcmStatus": "SAM"})["state"] == "SI"
+    reg = departure({**base, "ctot": "1530", "taxi": 15})
+    assert reg["delay"] == 15  # CTOT 15:30 - (EOBT 15:00 + 15 min kołowania)
     susp = departure({**base, "atfcmStatus": "FLS-NRA"})
-    assert (susp["state"], susp["suspension"]) == ("SUSP", "FLS-NRA")
-    assert departure({**base, "aobt": "1505", "atfcmStatus": "ATC_ACTIV"})["state"] == "OB"
+    assert (susp["state"], susp["suspension"]) == ("SU", "FLS-NRA")
+    assert departure({**base, "aobt": "1505", "atfcmStatus": "ATC_ACTIV"})["state"] == "AA"
     assert departure({**base, "atot": "1512"})["state"] == "TA"
     assert departure({**base, "cdmSts": "REA"})["ready"] is True
 

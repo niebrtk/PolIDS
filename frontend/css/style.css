@@ -239,7 +239,7 @@ td.tags .tag { padding: 0 4px; margin-right: 2px; font-size: 11px; }
 .rwy-use .pair span { color: var(--muted); font-size: 12px; margin-left: 6px; }
 .atis-text { font-size: 13px; color: #dfe8ff; }
 .ad-traffic h4 { margin: 6px 0 4px; color: var(--yellow); font-variant: small-caps; }
-table.data.traffic td { padding: 2px 6px; font-family: var(--mono); }
+table.data.traffic td { padding: 2px 6px; font-family: var(--mono); white-space: nowrap; }
 table.data.traffic a.cs { color: var(--cyan); font-weight: 700; text-decoration: none; }
 .notam-bar { display: flex; gap: 6px; align-items: center; margin-bottom: 8px; }
 .notam-bar .btn { padding: 2px 10px; }
@@ -463,11 +463,14 @@ table.callsigns td.minor { font-size: 12px; color: var(--muted); }
 .fs { display: inline-block; padding: 0 4px; border-radius: 3px; font: 700 11px var(--mono); border: 1px solid; cursor: help; }
 .fs-fi { color: #aab4bd; border-color: #56606a; }
 .fs-si { color: #1d1400; background: #ffb020; border-color: #ffb020; }
-.fs-susp { color: #fff; background: #d62828; border-color: #d62828; }
-.fs-ob { color: #00191d; background: #3ec7e0; border-color: #3ec7e0; }
+.fs-su { color: #fff; background: #d62828; border-color: #d62828; }
+.fs-aa { color: #00191d; background: #3ec7e0; border-color: #3ec7e0; }
 .fs-ta { color: #071a00; background: #5fd23a; border-color: #5fd23a; }
 .fs-rea { color: #5fd23a; border-color: #5fd23a; }
-table.data.traffic .ctot { color: #ffb020; font-weight: 700; cursor: help; }
+table.data.traffic .ctot { color: #fff; font-weight: 700; cursor: help; padding: 0 2px; border-radius: 2px; }
+table.data.traffic .ctot.d15 { background: #2f6fd6; } table.data.traffic .ctot.d30 { background: #e8c400; color: #1d1400; }
+table.data.traffic .ctot.d45 { background: #ff8c1a; color: #1d1400; } table.data.traffic .ctot.d60 { background: #d62828; }
+table.data.traffic .atot { color: #5fd23a; font-weight: 700; }
 table.data.traffic tr.offline td { opacity: .7; }
 .viff-note { margin: 3px 0 6px; font-size: 11px; }
 

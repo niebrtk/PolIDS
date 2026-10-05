@@ -15,14 +15,14 @@ from datetime import datetime, timedelta, timezone
 from ..config import settings
 from .http_cache import UpstreamError, fetch_text
 
-# Status lotu jak w liście lotów NM UI (flight state), wyliczany z pól vIFF.
-# Klucz: kod pokazywany w tabeli, wartość: opis w dymku.
+# Stan lotu jak w liście lotów NM (kody flight state z komunikatów EFD), wyliczany z pól vIFF.
+# vIFF ustawia ATC_ACTIV w chwili AOBT, więc to jest "AA"; lot w powietrzu bez ATC_ACTIV = "TA".
 FLIGHT_STATES = {
-    "FI": "FI: plan złożony, bez slotu",
-    "SI": "SI: slot wydany (CTOT)",
-    "SUSP": "SUSP: lot zawieszony (FLS)",
-    "OB": "OB: samolot ruszył z postoju (AOBT)",
-    "TA": "TA: w powietrzu (ATOT)",
+    "FI": "FI: plan złożony (filed), bez slotu",
+    "SI": "SI: slot wydany (slot issued, CTOT)",
+    "SU": "SU: lot zawieszony (suspended, FLS)",
+    "AA": "AA: aktywowany przez ATC (ATC activated, AOBT)",
+    "TA": "TA: aktywowany po starcie (tact activated, ATOT)",
 }
 
 
@@ -32,15 +32,19 @@ def hhmm(value) -> str | None:
     return s[:4] if len(s) >= 4 and s[:4].isdigit() else None
 
 
+def _mins(t: str | None) -> int | None:
+    return int(t[:2]) * 60 + int(t[2:]) if t else None
+
+
 def flight_state(f: dict) -> str:
     atfcm = (f.get("atfcmStatus") or "").upper()
     cdm = (f.get("cdmSts") or "").upper()
+    if atfcm.startswith("FLS") or cdm.startswith("FLS"):
+        return "SU"
+    if atfcm == "ATC_ACTIV":
+        return "AA"
     if hhmm(f.get("atot")) or cdm in ("AIRB", "COMPLY"):
         return "TA"
-    if atfcm.startswith("FLS") or cdm.startswith("FLS"):
-        return "SUSP"
-    if hhmm(f.get("aobt")) or atfcm == "ATC_ACTIV":
-        return "OB"
     if hhmm(f.get("ctot")) and atfcm != "SLC":
         return "SI"
     return "FI"
@@ -50,9 +54,13 @@ def departure(f: dict) -> dict:
     cdm = f.get("cdmData") or {}
     atfcm = f.get("atfcmData") or {}
     suspension = next((s for s in (f.get("atfcmStatus"), f.get("cdmSts")) if (s or "").upper().startswith("FLS")), None)
+    eobt, ctot = hhmm(f.get("eobt")), hhmm(f.get("ctot")) or hhmm(cdm.get("ctot"))
+    taxi = f.get("taxi") if isinstance(f.get("taxi"), int) else 0
+    # opóźnienie ATFM = CTOT - ETOT, ETOT = EOBT + czas kołowania (jak kolumna Delay w liście lotów NM)
+    delay = ((_mins(ctot) - _mins(eobt) - taxi + 720) % 1440 - 720) if ctot and eobt else None
     return {
         "callsign": f.get("callsign"), "arrival": f.get("arrival"),
-        "eobt": hhmm(f.get("eobt")), "ctot": hhmm(f.get("ctot")) or hhmm(cdm.get("ctot")),
+        "eobt": eobt, "ctot": ctot, "delay": delay,
         "tobt": hhmm(cdm.get("tobt")) or hhmm(f.get("tobt")), "tsat": hhmm(cdm.get("tsat")),
         "ttot": hhmm(cdm.get("ttot")), "aobt": hhmm(f.get("aobt")), "atot": hhmm(f.get("atot")),
         "state": flight_state(f), "suspension": suspension,
@@ -85,7 +93,7 @@ async def departures(icao: str) -> dict:
     icao = icao.upper()
     data = await _get("/ifps/depAirport", {"airport": icao})
     flights = [departure(f) for f in (data if isinstance(data, list) else []) if f.get("callsign")]
-    flights.sort(key=lambda f: (f["state"] == "TA", f["eobt"] or "9999", f["callsign"]))
+    flights.sort(key=lambda f: (bool(f["atot"]), f["eobt"] or "9999", f["callsign"]))
     return {"icao": icao, "cdm": await is_cdm_airport(icao), "flights": flights, "states": FLIGHT_STATES}
 
 
