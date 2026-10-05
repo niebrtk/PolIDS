@@ -8,13 +8,47 @@ from sqlalchemy.orm import Session
 from ..config import DATA_DIR, settings
 from ..database import get_db
 from ..importers.ese import parse_vfr_points
-from ..importers.sct import read_text
+from ..importers.sct import parse_line_groups, read_text, sections
 from ..models import AirwaySegment, AtcPosition, NavPoint, Sector
 from ..services.http_cache import UpstreamError
 from ..services.route import RouteResolver
 from ..services.vatsim import get_feed, match_positions
 
 router = APIRouter(prefix="/api/nav", tags=["map"])
+
+# Granice TMA i CTR z pliku .sct, tak jak rysuje je EuroScope: TMA = "EPxx TMA OUT/IN" z [ARTCC] i [ARTCC LOW],
+# CTR = "ZZ_CTR ALL" z [ARTCC LOW].
+AIRSPACE_KINDS = {
+    "tma": lambda name: " TMA " in f" {name} " or "MTMA" in name,
+    "ctr": lambda name: "CTR" in name.split()[0] and not name.startswith("AoR"),
+}
+
+
+@lru_cache(maxsize=1)
+def sct_line_groups() -> dict[str, list]:
+    out: dict[str, list] = {}
+    for f in sorted((DATA_DIR / "import").glob("*.sct")):
+        secs = sections(read_text(f))
+        for key in ("[ARTCC]", "[ARTCC LOW]"):
+            for name, segs in parse_line_groups(secs.get(key, [])).items():
+                out.setdefault(name, []).extend(segs)
+    return out
+
+
+@router.get("/airspace")
+def airspace(kind: str = Query("tma", pattern="^(tma|ctr)$")):
+    """Linie granic TMA albo CTR z pliku .sct jako GeoJSON (MultiLineString, współrzędne lon/lat).
+
+    `inner` = linie wewnętrzne podziału TMA (np. "EPBY TMA IN"), rysowane cieniej."""
+    feats = []
+    for name, segs in sct_line_groups().items():
+        if not AIRSPACE_KINDS[kind](name):
+            continue
+        feats.append({"type": "Feature", "properties": {"name": name, "inner": name.endswith(" IN")},
+                      "geometry": {"type": "MultiLineString",
+                                   "coordinates": [[[a[1], a[0]], [b[1], b[0]]] for a, b in segs]}})
+    return {"type": "FeatureCollection", "features": feats}
+
 
 @router.get("/route")
 def route(route: str = Query(..., min_length=3), db: Session = Depends(get_db)):

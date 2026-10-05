@@ -120,10 +120,14 @@ export function sectorOwners(gj, positions, online) {
   return { sector_owner: owners };
 }
 
-// Samolot: strzałka obrócona wg kursu, etykieta z callsignem (i FL/typem przy większym zoomie).
+// Sylwetka samolotu widziana z góry (nos do góry), obracana wg kursu
+export const PLANE_PATH = "M0,-9.5 C0.9,-9.5 1.3,-8.4 1.3,-7 L1.3,-2.6 L9,1.6 L9,3.3 L1.3,1 L1.1,5.6 L3.6,7.6 L3.6,8.9 L0,8 "
+  + "L-3.6,8.9 L-3.6,7.6 L-1.1,5.6 L-1.3,1 L-9,3.3 L-9,1.6 L-1.3,-2.6 L-1.3,-7 C-1.3,-8.4 -0.9,-9.5 0,-9.5 Z";
+
+// Samolot: sylwetka obrócona wg kursu, etykieta z callsignem (i FL/typem przy większym zoomie).
 export function aircraftMarker(p, { label = true, detail = false } = {}) {
   const fl = p.altitude !== null && p.altitude !== undefined ? "FL" + String(Math.round(p.altitude / 100)).padStart(3, "0") : "";
-  const html = `<div class="ac"><svg viewBox="-10 -10 20 20" style="transform:rotate(${p.heading || 0}deg)"><path d="M0,-9 L6,8 L0,4 L-6,8 Z"/></svg>`
+  const html = `<div class="ac"><svg viewBox="-10 -10 20 20" style="transform:rotate(${p.heading || 0}deg)"><path d="${PLANE_PATH}"/></svg>`
     + (label ? `<span>${esc(p.callsign)}${detail ? `<br>${fl} ${esc(p.aircraft || "")} ${p.groundspeed ?? ""}` : ""}</span>` : "") + "</div>";
   return L.marker([p.lat, p.lon], { icon: L.divIcon({ className: "acicon", html, iconSize: [20, 20], iconAnchor: [10, 10] }) });
 }

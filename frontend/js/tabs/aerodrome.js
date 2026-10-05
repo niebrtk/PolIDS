@@ -1,5 +1,4 @@
 import { api, esc, fmt, h, hhmm, positionTip, vatsimBookings, vatsimOnline } from "../api.js";
-import { renderChecklist } from "../checklist.js";
 import { colorize, wxLines } from "./meteo.js";
 
 const TYPE_ORDER = ["CTR", "FSS", "APP", "DEP", "TWR", "GND", "DEL", "ATIS"];
@@ -24,12 +23,24 @@ function lvpBox(lvp) {
   return `<div class="lvp lvp-${lvp.state.toLowerCase()}" data-tip="${esc(rule)}">${label}<span>${lvp.reasons.map(esc).join("<br>")}</span></div>`;
 }
 
-// Róża wiatrów: pasy jako prostokąty, strzałka wiatru skąd wieje. Kierunek pasa w użyciu / preferowany
-// zaznaczony kolorem, szewronami w kierunku lądowania/startu i podświetlonym oznaczeniem przy progu.
+// Róża wiatrów: pasy jako prostokąty, strzałka wiatru skąd wieje.
+// Kolor = rola: ARR zielony, DEP niebieski (ten sam pas do obu: połowa na połowę).
+// Wypełnienie pełne = pas w użyciu wg ATIS; kreskowane = pas preferowany (sugestia vPANDORA).
 const USE_COLOR = { arr: "#5fd23a", dep: "#3ec7e0" };
+const ROLE_LABEL = { arr: "ARR", dep: "DEP" };
+function roleSets(status) {
+  const use = status.runway_in_use || {};
+  const pref = status.preferred || {};
+  const atis = use.source === "ATIS" ? use : null;
+  const sugg = atis ? pref : (pref.arr ? pref : use);
+  // sugestię pokazujemy tylko tam, gdzie różni się od ATIS
+  const s = { arr: sugg.arr, dep: sugg.dep || sugg.arr };
+  if (atis) { if (s.arr === atis.arr) s.arr = null; if (s.dep === (atis.dep || atis.arr)) s.dep = null; }
+  return { active: atis ? { arr: atis.arr, dep: atis.dep || atis.arr } : {}, sugg: s };
+}
 function windrose(status) {
   const p = status.parsed || {};
-  const use = status.runway_in_use || {};
+  const { active, sugg } = roleSets(status);
   const size = 280, c = size / 2, r = 112;
   const pt = (deg, d) => [c + Math.sin(deg * Math.PI / 180) * d, c - Math.cos(deg * Math.PI / 180) * d];
   const pairs = [];
@@ -47,23 +58,42 @@ function windrose(status) {
     const [x, y] = pt(i * 90, r + 13);
     return `<text x="${x}" y="${y + 4}" fill="#9aa4af" font-size="12" text-anchor="middle">${t}</text>`;
   }).join("");
+  const defs = `<defs>${["arr", "dep"].map((k) => `<pattern id="wr-h-${k}" patternUnits="userSpaceOnUse" width="6" height="6" patternTransform="rotate(45)">
+    <rect width="6" height="6" fill="#151a1f"/><rect width="3" height="6" fill="${USE_COLOR[k]}"/></pattern>`).join("")}</defs>`;
+  const rolesOf = (set, d) => ["arr", "dep"].filter((k) => set[k] === d);
   let rw = "", marks = "";
   pairs.forEach((g) => {
-    const role = (d) => (d === use.arr ? "arr" : d === use.dep ? "dep" : null);
-    const active = g.ends.find((e) => role(e.designator));
-    const col = active ? USE_COLOR[role(active.designator)] : null;
     const hdg = g.ends[0].heading;
-    rw += `<rect x="${c - 7}" y="${c - 72}" width="14" height="144" fill="${col ? "#1f3a1a" : "#555"}" stroke="${col || "#888"}" stroke-width="${col ? 2 : 1}" transform="rotate(${hdg} ${c} ${c})"/>`;
+    const act = [...new Set(g.ends.flatMap((e) => rolesOf(active, e.designator)))];
+    const sug = [...new Set(g.ends.flatMap((e) => rolesOf(sugg, e.designator)))];
+    const roles = act.length ? act : sug;
+    const solid = act.length > 0;
+    const fill = (k) => (solid ? USE_COLOR[k] : `url(#wr-h-${k})`);
+    const tr = `transform="rotate(${hdg} ${c} ${c})"`;
+    if (!roles.length) {
+      rw += `<rect x="${c - 7}" y="${c - 72}" width="14" height="144" fill="#555" stroke="#888" ${tr}/>`;
+    } else if (roles.length === 1) {
+      rw += `<rect x="${c - 7}" y="${c - 72}" width="14" height="144" fill="${fill(roles[0])}" ${tr}/>`;
+    } else {
+      rw += `<rect x="${c - 7}" y="${c - 72}" width="7" height="144" fill="${fill("arr")}" ${tr}/><rect x="${c}" y="${c - 72}" width="7" height="144" fill="${fill("dep")}" ${tr}/>`;
+    }
+    if (roles.length) {
+      rw += `<rect x="${c - 7}" y="${c - 72}" width="14" height="144" fill="none" stroke="#fff" stroke-width="1.5" ${solid ? "" : 'stroke-dasharray="5 3"'} ${tr}/>`;
+    }
     g.ends.forEach((e) => {
-      const ro = role(e.designator);
-      // oznaczenie przy progu (z którego startuje / na który ląduje samolot lecący kursem pasa)
-      const [x, y] = pt(e.heading + 180, 86);
-      marks += `<text x="${x}" y="${y + 5}" text-anchor="middle" font-family="monospace" font-weight="700"
-        font-size="${ro ? 16 : 12}" fill="${ro ? USE_COLOR[ro] : "#c8ced4"}" stroke="#000" stroke-width="3" paint-order="stroke">${esc(e.designator)}</text>`;
-      if (ro) {
+      const ra = rolesOf(active, e.designator), rs = rolesOf(sugg, e.designator);
+      const ro = ra.length ? ra : rs;
+      // oznaczenie przy progu (z którego startuje / na który ląduje samolot lecący kursem pasa) i rola
+      const [x, y] = pt(e.heading + 180, 88);
+      const col = ro.length ? USE_COLOR[ro[0]] : "#c8ced4";
+      marks += `<text x="${x}" y="${y + 3}" text-anchor="middle" font-family="monospace" font-weight="700"
+        font-size="${ro.length ? 16 : 12}" fill="${col}" stroke="#000" stroke-width="3" paint-order="stroke">${esc(e.designator)}</text>`;
+      if (ro.length) {
+        marks += `<text x="${x}" y="${y + 15}" text-anchor="middle" font-family="monospace" font-weight="700" font-size="10"
+          fill="${col}" stroke="#000" stroke-width="3" paint-order="stroke">${ro.map((k) => ROLE_LABEL[k]).join("/")}${ra.length ? "" : "?"}</text>`;
         // szewrony wzdłuż pasa w kierunku ruchu
-        marks += `<g transform="rotate(${e.heading} ${c} ${c})" fill="none" stroke="${USE_COLOR[ro]}" stroke-width="3">${[48, 12, -24]
-          .map((o) => `<polyline points="${c - 5},${c + o + 6} ${c},${c + o} ${c + 5},${c + o + 6}"/>`).join("")}</g>`;
+        marks += `<g transform="rotate(${e.heading} ${c} ${c})" fill="none" stroke="#fff" stroke-width="2.5" opacity="${ra.length ? 1 : 0.7}">${[48, 12, -24]
+          .map((o) => `<polyline points="${c - 5},${c + o + 6} ${c},${c + o} ${c + 5},${c + o + 6}" stroke="#000" stroke-width="5"/><polyline points="${c - 5},${c + o + 6} ${c},${c + o} ${c + 5},${c + o + 6}"/>`).join("")}</g>`;
       }
     });
   });
@@ -77,7 +107,8 @@ function windrose(status) {
     const span = ((p.wind_var_to - p.wind_var_from) + 360) % 360;
     arrow += `<path d="M${x1},${y1} A${r - 18},${r - 18} 0 ${span > 180 ? 1 : 0} 1 ${x2},${y2}" stroke="#ffb020" stroke-width="3" fill="none"/>`;
   }
-  return `<svg class="windrose" viewBox="0 0 ${size} ${size}"><circle cx="${c}" cy="${c}" r="${r}" fill="#1b1f24" stroke="#3c444e"/>${ticks}${labels}${rw}${arrow}${marks}</svg>`;
+  return `<svg class="windrose" viewBox="0 0 ${size} ${size}">${defs}<circle cx="${c}" cy="${c}" r="${r}" fill="#1b1f24" stroke="#3c444e"/>${ticks}${labels}${rw}${arrow}${marks}</svg>
+    <div class="wr-legend"><span><i class="sw-arr"></i>ARR</span><span><i class="sw-dep"></i>DEP</span><span><i class="sw-solid"></i>ATIS</span><span><i class="sw-hatch"></i>sugestia</span></div>`;
 }
 
 // Pas w użyciu z ATIS albo preferowany wg vPANDORA (wiatr, wyposażenie, LVP)
@@ -97,20 +128,21 @@ function runwayBox(st) {
 
 const EQUIP_SHOW = ["ILS", "LOC", "RNP"];
 function runwayTable(st) {
-  const u = st.runway_in_use || {};
-  const role = (d) => [d === u.arr ? "ARR" : "", d === u.dep ? "DEP" : ""].filter(Boolean).join("/");
+  const { active, sugg } = roleSets(st);
+  const tags = (d) => ["arr", "dep"].map((k) => (active[k] === d ? `<span class="tag ${k}">${ROLE_LABEL[k]}</span>`
+    : sugg[k] === d ? `<span class="tag ${k} sugg" title="sugestia vPANDORA">${ROLE_LABEL[k]}?</span>` : "")).join("");
   return `<table class="data rwy-table"><thead><tr><th>Pas</th><th></th><th>Kurs</th><th>Dł. m</th><th>Podejście</th><th>Czoł.</th><th>Bocz.</th></tr></thead><tbody>
     ${st.runways.map((r) => {
-      const ro = role(r.designator);
+      const tg = tags(r.designator);
       const eq = r.equipment || [];
       const tip = `${r.designator}: ${fmt(r.length_m, 0)} × ${fmt(r.width_m, 0)} m, ${r.surface || "?"}; podejścia: ${eq.join(", ") || "brak danych"}`;
-      return `<tr class="${ro ? "inuse" : ""}" title="${esc(tip)}"><td class="rwy">${esc(r.designator)}</td><td>${ro ? `<span class="tag use">${ro}</span>` : ""}</td>
+      return `<tr class="${tg ? "inuse" : ""}" title="${esc(tip)}"><td class="rwy">${esc(r.designator)}</td><td class="tags">${tg}</td>
       <td class="num">${fmt(r.heading, 0)}°</td><td class="num">${fmt(r.length_m, 0)}</td>
       <td>${eq.filter((k) => EQUIP_SHOW.includes(k)).map((k) => `<span class="eq ${k === "ILS" ? "ils" : ""}">${k}</span>`).join("")}</td>
-      <td class="num" style="color:${r.headwind < 0 ? "var(--bad)" : "inherit"}">${r.headwind === null ? "–" : (r.headwind < 0 ? "TW " : "") + Math.abs(r.headwind).toFixed(0)}</td>
-      <td class="num">${r.crosswind === null ? "–" : Math.abs(r.crosswind).toFixed(0) + (r.crosswind > 0 ? " R" : r.crosswind < 0 ? " L" : "")}</td></tr>`;
+      <td class="num" style="color:${r.headwind < 0 ? "var(--bad)" : "inherit"}">${r.headwind === null ? "–" : (r.headwind < 0 ? "TW " : "") + Math.abs(r.headwind).toFixed(0) + " kt"}</td>
+      <td class="num">${r.crosswind === null ? "–" : Math.abs(r.crosswind).toFixed(0) + " kt" + (r.crosswind > 0 ? " R" : r.crosswind < 0 ? " L" : "")}</td></tr>`;
     }).join("")}
-  </tbody></table><div class="hint">wiatr w kt · najedź na pas: szerokość, nawierzchnia, wszystkie podejścia</div>`;
+  </tbody></table><div class="hint">TW = wiatr w plecy · ARR? / DEP? = sugestia vPANDORA · najedź na pas: szerokość, nawierzchnia, podejścia</div>`;
 }
 
 // NOTAM: okres ważności względem teraz
@@ -189,14 +221,6 @@ export default {
       $("#ad-list").innerHTML = ads.map((a) => `<option value="${a.icao}">${esc(a.name)}</option>`).join("");
     });
 
-    const renderOpenChecklist = async (el) => {
-      try {
-        const chk = await api(`/api/aerodromes/${icao}/checklist`);
-        el.closest(".card").querySelector("h3").textContent = chk.title;
-        renderChecklist(el, chk, `checklist.ad.${icao}`);
-      } catch (e) { el.innerHTML = `<span class="error">${esc(e.message)}</span>`; }
-    };
-
     const renderTraffic = async (el) => {
       try {
         el.innerHTML = trafficHtml(await api(`/api/vatsim/airport/${icao}`), icao);
@@ -254,8 +278,8 @@ export default {
         `Zielone = online, przerywana ramka = rezerwacja (najedź, żeby zobaczyć kto). ${errs.length ? `<span class="error">${errs.join(" · ")}</span>` : ""}`);
     };
 
-    // Układ na jeden ekran: cztery kolumny, długie listy przewijają się wewnątrz swoich okienek.
-    // Szkielet budujemy raz na lotnisko (checklista i NOTAM-y zostają), dane odświeżamy co minutę.
+    // Układ na jeden ekran: trzy kolumny, długie listy przewijają się wewnątrz swoich okienek
+    // (checklista jest tylko w zakładce CHECKLIST). Szkielet budujemy raz na lotnisko, dane odświeżamy co minutę.
     const build = () => {
       $(".content").innerHTML = `
         <div class="ad-errors"></div>
@@ -275,12 +299,8 @@ export default {
             <div class="card part"><h3>Częstotliwości · online · rezerwacje</h3><div class="scroll freqs"></div></div>
             <div class="card grow"><h3>NOTAM</h3><div class="scroll notams"></div></div>
           </div>
-          <div class="ad-col">
-            <div class="card grow"><h3>Checklista</h3><div class="scroll checklist"></div></div>
-          </div>
         </div>`;
       renderNotams($(".notams"));
-      renderOpenChecklist($(".checklist"));
     };
 
     let ticks = 0;

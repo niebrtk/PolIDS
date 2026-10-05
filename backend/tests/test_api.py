@@ -122,3 +122,13 @@ def test_vatsim_atc_badges(client):
     assert sorted(ep["facilities"]) == ["APP", "ATIS", "GND"] and ep["lat"] > 52
     assert ep["facilities"]["ATIS"][0]["atis_code"] == "K"
     assert r["firs"]["EDWW-FLG"][0]["name"] == "Max"
+
+
+def test_airspace_lines_and_embed_check(client):
+    tma = client.get("/api/nav/airspace?kind=tma").json()
+    names = {f["properties"]["name"] for f in tma["features"]}
+    assert "EPWA TMA OUT" in names and all("TMA" in n for n in names)
+    ctr = client.get("/api/nav/airspace?kind=ctr").json()
+    assert ctr["features"] and ctr["features"][0]["geometry"]["type"] == "MultiLineString"
+    assert client.get("/api/nav/airspace?kind=xyz").status_code == 422
+    assert client.get("/api/embed-check/nieznany").status_code == 404
