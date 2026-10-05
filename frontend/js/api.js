@@ -77,12 +77,32 @@ export function iframeWithFallback(pane, url, note = "") {
   pane.append(h(`<iframe class="embed" src="${esc(url)}" referrerpolicy="no-referrer"></iframe>`));
 }
 
-// Podkłady mapy. Klucz CARTO (opcjonalny, VPANDORA_CARTO_API_KEY w pliku .env) dokładamy do adresu kafelków;
-// bez klucza podkłady CARTO też działają. "white" = sama biała plansza bez kafelków.
-const carto = (style, key) => `https://{s}.basemaps.cartocdn.com/${style}/{z}/{x}/{y}{r}.png${key ? "?api_key=" + encodeURIComponent(key) : ""}`;
+// Podkłady mapy. CARTO wymaga klucza w parametrze ?key= (VPANDORA_CARTO_API_KEY); bez klucza kafelki dostają
+// znak wodny "API KEY REQUIRED". Dlatego bez klucza (albo gdy CARTO odrzuca klucz, np. 403 przy ograniczeniu
+// domen) używamy szarych podkładów Esri Canvas, które działają bez klucza. "white" = sama biała plansza.
+const CARTO_ATTR = '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>, © <a href="https://carto.com/attributions">CARTO</a>';
+const ESRI_ATTR = "Powered by Esri | Esri, HERE, Garmin, © OpenStreetMap contributors, and the GIS user community";
+const cartoUrl = (style, key) => `https://{s}.basemaps.cartocdn.com/rastertiles/${style}/{z}/{x}/{y}{r}.png?key=${encodeURIComponent(key)}`;
+// Esri ma kafelki Europy do zoomu 16, dalej powiększamy ostatni poziom
+const esri = (L, svc) => L.tileLayer(`https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/${svc}/MapServer/tile/{z}/{y}/{x}`,
+  { attribution: ESRI_ATTR, maxNativeZoom: 16, maxZoom: 19 });
+function cartoOrEsri(L, style, svc, key) {
+  key = (key || "").trim();
+  if (!key) return esri(L, svc);
+  const group = L.layerGroup();
+  const carto = L.tileLayer(cartoUrl(style, key), { attribution: CARTO_ATTR, subdomains: "abcd", maxZoom: 20 });
+  let errors = 0;
+  carto.on("tileerror", () => {
+    if (++errors !== 4) return;
+    console.warn("CARTO nie wydaje kafelków (np. 403: klucz ograniczony do innych domen), przełączam podkład na Esri");
+    group.removeLayer(carto);
+    group.addLayer(esri(L, svc));
+  });
+  return group.addLayer(carto);
+}
 export const BASEMAPS = {
-  dark: (L, key) => L.tileLayer(carto("dark_nolabels", key), { attribution: "© OpenStreetMap, © CARTO", subdomains: "abcd", maxZoom: 19 }),
-  light: (L, key) => L.tileLayer(carto("light_nolabels", key), { attribution: "© OpenStreetMap, © CARTO", subdomains: "abcd", maxZoom: 19 }),
+  dark: (L, key) => cartoOrEsri(L, "dark_nolabels", "World_Dark_Gray_Base", key),
+  light: (L, key) => cartoOrEsri(L, "light_nolabels", "World_Light_Gray_Base", key),
   white: (L) => L.layerGroup(),
   osm: (L) => L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { attribution: "© OpenStreetMap", maxZoom: 19 }),
 };

@@ -62,12 +62,14 @@ ponownie i rozpakuj w miejsce starego folderu. Jeśli po aktualizacji coś wygl�
 ### Ustawienia
 
 Skopiuj `.env.example` do `.env`. Najważniejsze: domyślne lotnisko, źródło METAR, linki eAIP (zmieniają się co AIRAC),
-serwer NOTAM, klucz OpenAIP do nakładki lotniczej na mapie i opcjonalny klucz CARTO do podkładów mapy.
+serwer NOTAM, klucz OpenAIP do nakładki lotniczej na mapie i klucz CARTO do podkładów mapy (darmowy z <https://carto.com/basemaps/apikey>;
+bez niego CARTO dodaje na kafelkach znak wodny „API KEY REQUIRED”, więc mapa używa wtedy szarego podkładu Esri).
 
 Klucze API wpisuj tylko w lokalnym pliku `.env` (jest w `.gitignore`), np. `VPANDORA_CARTO_API_KEY=...`.
 Jeśli za każdym razem pobierasz nowy ZIP do nowego folderu, plik `.env` zostaje w starym folderze. Wtedy wygodniej
 ustawić klucz raz jako zmienną środowiskową Windows (w oknie `cmd`): `setx VPANDORA_CARTO_API_KEY twoj_klucz`,
-a potem uruchomić `run.bat` od nowa. Zakładka **?** pokazuje, czy klucz został wczytany.
+a potem zamknąć okno serwera i uruchomić `run.bat` od nowa podwójnym kliknięciem (`setx` działa tylko w oknach
+otwartych po nim). Zakładka **?** pokazuje, czy klucz został wczytany.
 Plik `.venv\pyvenv.cfg` to konfiguracja środowiska Pythona, aplikacja go nie czyta.
 Repozytorium jest publiczne, więc klucze nie powinny trafiać do żadnego pliku w repo.
 
@@ -155,7 +157,7 @@ vpandora/
 - Typy samolotów: [aircraft-database.com](https://aircraft-database.com) (ODC-By), progi WTC/RECAT i nadpisania z
   [vatger/atciss](https://github.com/vatger/atciss) (MIT).
 - Lotniska, pasy, pomoce nawigacyjne: [OurAirports](https://ourairports.com/data/) (domena publiczna).
-- Leaflet (BSD-2), podkład CARTO/OpenStreetMap (ODbL).
+- Leaflet (BSD-2), podkład CARTO/OpenStreetMap (ODbL), zastępczy podkład Esri World Gray Canvas (Esri, HERE, Garmin, OSM).
 - Granice FIR: [vatsimnetwork/vatspy-data-project](https://github.com/vatsimnetwork/vatspy-data-project) (CC BY-SA 4.0), plik `data/seed/vatspy_firs.geojson`.
 - Zdjęcia samolotów pobierane z Wikipedii; autor i licencja są na stronie artykułu podlinkowanej pod zdjęciem.
 - Pliki EuroScope (pakiet sektorowy PL vACC / GNG) są w `data/import/`, PDF-y w `data/docs/`.

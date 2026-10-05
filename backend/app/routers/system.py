@@ -25,7 +25,7 @@ def config():
             "phraseology": settings.phraseology_url, "performance_db": settings.performance_db_url,
         },
         "openaip_api_key": settings.openaip_api_key,
-        "carto_api_key": settings.carto_api_key,
+        "carto_api_key": settings.carto_api_key.strip(),
         "metar_source": settings.metar_source,
     }
 
