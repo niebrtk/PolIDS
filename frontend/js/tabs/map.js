@@ -1,10 +1,13 @@
 import { BASEMAPS, LIGHT_BASEMAPS, api, atcPositions, esc, h, hhmm, vatsimAtc, vatsimOnline } from "../api.js";
-import { FACILITIES, SymbolMarker, aircraftMarker, airportBadge, atcPanes, drawFirs, drawSectors, fl, loadFirs, sectorOwners, symbolFor, symbolSvg } from "../airspace.js";
+import { FACILITIES, PLANE_PATH, SymbolMarker, aircraftMarker, airportBadge, atcPanes, drawFirs, drawSectors, fl, loadFirs, sectorOwners, symbolFor, symbolSvg } from "../airspace.js";
+import { colorize } from "./meteo.js";
 
 // Kolory zależne od podkładu (ciemny / jasny)
 const THEME = {
-  dark: { ad: "#c8ced4", vor: "#3ecf6e", ndb: "#c58cff", fix: "#8c969e", vfr: "#ffb020", route: "#ff4dd2", flight: "#ff9f1a", halo: "#000", airway: "#5f6b78" },
-  light: { ad: "#33393f", vor: "#0a7a36", ndb: "#7b2cbf", fix: "#5c656c", vfr: "#c26a00", route: "#b0007c", flight: "#d4380d", halo: "#fff", airway: "#8b96a0" },
+  dark: { ad: "#c8ced4", vor: "#3ecf6e", ndb: "#c58cff", fix: "#8c969e", vfr: "#ffb020", route: "#ff4dd2", flight: "#ff9f1a", halo: "#000", airway: "#5f6b78",
+    tma: "#7f95ff", ctr: "#ff6b6b" },
+  light: { ad: "#33393f", vor: "#0a7a36", ndb: "#7b2cbf", fix: "#5c656c", vfr: "#c26a00", route: "#b0007c", flight: "#d4380d", halo: "#fff", airway: "#8b96a0",
+    tma: "#3550c8", ctr: "#d62828" },
 };
 const KIND_COLOR = { aerodrome: "ad", vor: "vor", ndb: "ndb", fix: "fix", vfr: "vfr" };
 const sw = (cls, label, checked = false, sym = "") => `<label class="sw"><input type="checkbox" class="${cls}" ${checked ? "checked" : ""}>
@@ -18,9 +21,9 @@ export default {
           <button class="btn ms-hide" title="Schowaj panel">«</button></div>
         <section class="ms-card">
           <h4>Ruch VATSIM</h4>
-          ${sw("traffic", "samoloty", true, `<svg class="sym" width="18" height="18" viewBox="-10 -10 20 20"><path d="M0,-9 L6,8 L0,4 L-6,8 Z" class="acsym"/></svg>`)}
+          ${sw("traffic", "samoloty", true, `<svg class="sym" width="18" height="18" viewBox="-10 -10 20 20"><path d="${PLANE_PATH}" class="acsym"/></svg>`)}
           ${sw("traffic-detail", "etykiety z FL, typem i GS")}
-          ${sw("atc", "kontrolerzy online: plakietki D / G / T / A / APP", true, `<span class="ab ab-twr">T</span>`)}
+          ${sw("atc", "kontrolerzy online: plakietki (FIR EPWW, u sąsiadów tylko APP)", true, `<span class="ab ab-twr">T</span>`)}
           <div class="atc-info hint"></div>
           <div class="traffic-info hint"></div>
           <div class="flight" style="display:none"></div>
@@ -36,14 +39,16 @@ export default {
           <div class="ms-row"><label class="hint">Poziom</label><span class="flbox">FL<input type="number" class="field fl" value="300" min="0" max="660" step="5"></span></div>
           ${sw("sectors", "sektory EPWW", true, `<span class="swatch sec"></span>`)}
           ${sw("online", "aktualna sektoryzacja (kto jest online)", true, `<span class="swatch on"></span>`)}
-          ${sw("firs", "FIR-y sąsiednie (VATSpy)", true, `<span class="swatch fir"></span>`)}
+          ${sw("tma", "TMA", true, `<span class="swatch tma"></span>`)}
+          ${sw("ctrs", "CTR (wypełnione, gdy TWR online)", true, `<span class="swatch ctr"></span>`)}
+          ${sw("firs", "granice FIR-ów sąsiednich (VATSpy)", true, `<span class="swatch fir"></span>`)}
           <div class="sector-info hint"></div>
         </section>
         <section class="ms-card">
           <h4>Punkty i drogi</h4>
           ${sw("ads", "lotniska", true, `<i data-sym="aerodrome"></i>`)}
-          ${sw("navaids", "VOR / DME", true, `<i data-sym="vor"></i>`)}
-          ${sw("ndbs", "NDB", true, `<i data-sym="ndb"></i>`)}
+          ${sw("navaids", "VOR / DME", false, `<i data-sym="vor"></i>`)}
+          ${sw("ndbs", "NDB", false, `<i data-sym="ndb"></i>`)}
           ${sw("vfrs", "punkty VFR <small>(zoom ≥ 8)</small>", false, `<i data-sym="vfr"></i>`)}
           ${sw("fixes", "punkty FIX <small>(zoom ≥ 8)</small>", false, `<i data-sym="fix"></i>`)}
           ${sw("airways", "drogi lotnicze <small>(zoom ≥ 7)</small>", false, `<span class="swatch awy"></span>`)}
@@ -60,7 +65,9 @@ export default {
           <h4>Legenda</h4>
           <div class="lg"><span class="lg-line lg-flight"></span>trasa wybranego samolotu</div>
           <div class="lg"><span class="lg-line lg-route"></span>trasa wpisana ręcznie</div>
-          <div class="lg"><span class="swatch on"></span>sektor / FIR obsadzony (online)</div>
+          <div class="lg"><span class="swatch on"></span>sektor obsadzony (online)</div>
+          <div class="lg"><span class="swatch tma"></span>TMA (wypełniona, gdy APP online)</div>
+          <div class="lg"><span class="swatch ctr"></span>CTR (wypełniona, gdy TWR online)</div>
           <div class="lg"><span class="swatch unicom"></span>sektor bez kontrolera (UNICOM 122.800)</div>
           <div class="lg"><span class="lg-freq">133.475</span>częstotliwość obsadzonego sektora</div>
           <div class="lg lg-atc">${FACILITIES.map(([k, l, n]) => `<span><span class="ab ab-${k.toLowerCase()}">${l}</span>${n}</span>`).join("")}
@@ -82,6 +89,7 @@ export default {
     let theme = THEME.dark;
     const layers = {
       firs: L.layerGroup().addTo(map), sectors: L.layerGroup().addTo(map), airways: L.layerGroup(),
+      airOn: L.layerGroup().addTo(map), tma: L.layerGroup().addTo(map), ctrs: L.layerGroup().addTo(map),
       ads: L.layerGroup().addTo(map), points: L.layerGroup().addTo(map), route: L.layerGroup().addTo(map), atc: L.layerGroup().addTo(map),
       traffic: L.layerGroup().addTo(map), flight: L.layerGroup().addTo(map),
     };
@@ -104,7 +112,7 @@ export default {
       mapEl.classList.toggle("light", light);
       mapEl.classList.toggle("white", baseName === "white");
       pane.querySelectorAll(".seg button").forEach((b) => b.classList.toggle("on", b.dataset.base === baseName));
-      drawAds(); loadVisible(); redrawFlight(); redrawRoute();
+      drawAds(); loadVisible(); redrawFlight(); redrawRoute(); drawAirspace(); loadSectors();
     };
     $(".seg").addEventListener("click", (e) => { const b = e.target.closest("button[data-base]"); if (b) setBase(b.dataset.base); });
     $(".openaip").addEventListener("change", (e) => {
@@ -123,13 +131,47 @@ export default {
     $(".ms-show").addEventListener("click", () => { pane.querySelector(".mapwrap").classList.remove("collapsed"); setTimeout(() => map.invalidateSize(), 50); });
 
     // Punkt jako symbol EuroScope z nazwą obok
-    const pointMarker = (p, { color, label = true, scale = 1.6, weight = 1.6, permanent = true, cls = "lbl", popup = true } = {}) => {
+    const pointMarker = (p, { color, label = true, scale = 1.6, weight = 1.6, permanent = true, cls = "lbl", popup = true, tooltip = true } = {}) => {
       const sym = symbolFor(p.kind);
       const m = new SymbolMarker([p.lat, p.lon], { symbol: sym, color: color || theme[KIND_COLOR[sym]], scale, weight, radius: 7 * scale / 1.6 });
       const full = `${esc(p.ident)} ${esc(p.kind)}${p.frequency ? " " + esc(p.frequency) : ""}${p.name ? " " + esc(p.name) : ""}`;
       if (label) m.bindTooltip(esc(p.ident), { permanent, direction: "right", offset: [6 * scale / 1.6, 0], className: cls });
-      else m.bindTooltip(full);
+      else if (tooltip) m.bindTooltip(full);
       if (label && popup) m.bindPopup(full);
+      return m;
+    };
+
+    // --- dymek lotniska: ICAO, nazwa, METAR, kontrolerzy online i ATIS (dane ładowane po najechaniu)
+    let atcData = { airports: [] };
+    const metarCache = {};
+    const metarFor = (icao) => {
+      const hit = metarCache[icao];
+      if (hit && Date.now() - hit.t < 120000) return hit.p;
+      const p = api(`/api/meteo/metar?ids=${icao}`).then((r) => r[0]?.raw || null).catch(() => null);
+      metarCache[icao] = { t: Date.now(), p };
+      return p;
+    };
+    const adCard = (icao, name, metar) => {
+      const ap = atcData.airports.find((a) => a.icao === icao);
+      const fac = ap?.facilities || {};
+      const ctrls = FACILITIES.filter(([k]) => k !== "ATIS" && fac[k]).flatMap(([k, l]) => fac[k].map((c) => ({ ...c, k, l })));
+      const atis = fac.ATIS || [];
+      return `<div class="adc-h"><b>${esc(icao)}</b><span>${esc(name || "")}</span></div>
+        <div class="adc-sec">METAR</div><div class="adc-metar wx">${metar === undefined ? '<span class="hint">ładowanie…</span>' : metar ? colorize(metar) : '<span class="hint">brak</span>'}</div>
+        <div class="adc-sec">Kontrola</div>${ctrls.length ? `<table>${ctrls.map((c) => `<tr><td><span class="ab ab-${c.k.toLowerCase()}">${c.l}</span></td>
+          <td class="cs">${esc(c.callsign)}</td><td class="fq">${esc(c.frequency)}</td><td>${esc(c.name || "")}</td><td class="muted">od ${hhmm(c.logon_time)}</td></tr>`).join("")}</table>`
+          : '<div class="hint">nikt nie jest zalogowany (UNICOM 122.800)</div>'}
+        ${atis.map((a) => `<div class="adc-sec">ATIS ${esc(a.atis_code || "")} <span class="muted">${esc(a.callsign)} ${esc(a.frequency)}</span></div>
+          <div class="adc-atis">${(a.text_atis || []).map(esc).join(" ")}</div>`).join("")}`;
+    };
+    // Dymek podpinamy do markera; METAR doładowuje się przy pierwszym najechaniu
+    const bindAdCard = (m, icao, name) => {
+      m.bindTooltip(() => adCard(icao, name, metarCache[icao]?.v), { direction: "top", offset: [0, -8], className: "atc-tip ad-tip", opacity: 1, pane: panes.tip });
+      m.on("tooltipopen", async () => {
+        const v = await metarFor(icao);
+        if (metarCache[icao]) metarCache[icao].v = v;
+        if (m.isTooltipOpen()) m.setTooltipContent(adCard(icao, name, v));
+      });
       return m;
     };
 
@@ -142,9 +184,15 @@ export default {
       ads.forEach((a) => {
         const big = a.kind === "large_airport" || a.kind === "medium_airport";
         if (!big && z < 8 && !atcAds.has(a.icao)) return;
-        pointMarker({ ident: a.icao, kind: "AD", lat: a.lat, lon: a.lon, name: a.name },
-          { label: !atcAds.has(a.icao) && (z >= 7 || (big && z >= 6)), permanent: true, scale: big ? 1.8 : 1.4, popup: false })
+        const scale = big ? 1.8 : 1.4;
+        const m = pointMarker({ ident: a.icao, kind: "AD", lat: a.lat, lon: a.lon, name: a.name }, { label: false, tooltip: false, scale, popup: false })
           .on("click", () => ctx.open("aerodrome", a.icao)).addTo(layers.ads);
+        bindAdCard(m, a.icao, a.city || a.name);
+        // nazwa jako osobna stała etykieta (marker ma już dymek z kartą lotniska)
+        if (!atcAds.has(a.icao) && (z >= 7 || (big && z >= 6))) {
+          L.tooltip([a.lat, a.lon], { content: esc(a.icao), permanent: true, direction: "right", offset: [6 * scale / 1.6, 0], className: "lbl", interactive: false })
+            .addTo(layers.ads);
+        }
       });
     };
     api("/api/aerodromes").then((list) => {
@@ -153,19 +201,64 @@ export default {
     });
     $(".ads").addEventListener("change", (e) => (e.target.checked ? layers.ads.addTo(map) : map.removeLayer(layers.ads)));
 
+    // --- TMA i CTR: kontury z pliku .sct (jak w EuroScope), wypełnienie z sektorów .ese, gdy obsadzone:
+    // CTR, gdy właścicielem jest TWR; TMA, gdy APP
+    const airspaceLines = { tma: api("/api/nav/airspace?kind=tma").catch(() => null), ctr: api("/api/nav/airspace?kind=ctr").catch(() => null) };
+    const drawAirspace = async () => {
+      const [tma, ctr] = await Promise.all([airspaceLines.tma, airspaceLines.ctr]);
+      layers.tma.clearLayers();
+      layers.ctrs.clearLayers();
+      if (tma && $(".tma").checked) {
+        L.geoJSON(tma, { interactive: false, style: (f) => (f.properties.inner
+          ? { color: theme.tma, weight: 1, opacity: 0.55, dashArray: "4 4" } : { color: theme.tma, weight: 1.6, opacity: 0.95 }) }).addTo(layers.tma);
+      }
+      if (ctr && $(".ctrs").checked) {
+        L.geoJSON(ctr, { interactive: false, style: { color: theme.ctr, weight: 1.4, opacity: 0.9, dashArray: "6 3" } }).addTo(layers.ctrs);
+      }
+    };
+    let allSectors = null;
+    const isCtr = (n) => /^EP[A-Z]{2}_M?CTR\d*$/.test(n);
+    const isTma = (n) => /^EP[A-Z]{2}_M?TMA/.test(n);
+    function drawAirspaceFills(gj, positions, online) {
+      layers.airOn.clearLayers();
+      if (!gj || !online) return;
+      const want = (n) => ($(".ctrs").checked && isCtr(n)) || ($(".tma").checked && isTma(n));
+      const feats = gj.features.filter((f) => want(f.properties.name));
+      const owners = sectorOwners({ features: feats }, positions, online).sector_owner;
+      const seen = new Set();
+      feats.forEach((f) => {
+        const n = f.properties.name, own = owners[n];
+        const ctr = isCtr(n);
+        if (!own || !own.callsign.endsWith(ctr ? "_TWR" : "_APP")) return;
+        const key = ctr ? n.split("_")[0] : n;
+        if (seen.has(key)) return;  // EPKK_CTR07 / CTR25 to ta sama strefa w dwóch konfiguracjach
+        seen.add(key);
+        const color = ctr ? theme.ctr : theme.tma;
+        L.geoJSON(f, { style: { stroke: false, fillColor: color, fillOpacity: ctr ? 0.24 : 0.13 } })
+          .bindTooltip(`<b>${esc(ctr ? key + " CTR" : n)}</b> ${fl(f.properties.lower_ft)}–${fl(f.properties.upper_ft)}<br>${esc(own.callsign)} ${esc(own.frequency)} · ${esc(own.name || "")}`, { sticky: true })
+          .addTo(layers.airOn);
+      });
+    }
+    ["tma", "ctrs"].forEach((c) => $("." + c).addEventListener("change", () => { drawAirspace(); loadSectors(); }));
+
     // --- sektory EPWW i FIR-y sąsiednie, podświetlone wg zalogowanych kontrolerów
     const loadSectors = async () => {
       const level = parseInt($(".fl").value || "0", 10);
       const wantOnline = $(".online").checked;
-      const [gj, firs, net, positions] = await Promise.all([
+      const needAir = $(".tma").checked || $(".ctrs").checked;
+      const [gj, firs, net, positions, gjAll] = await Promise.all([
         $(".sectors").checked ? api(`/api/nav/sectors?fir=EPWW&level_ft=${level * 100}`) : null,
         $(".firs").checked ? loadFirs().catch(() => null) : null,
-        wantOnline || $(".firs").checked ? vatsimOnline().catch((e) => ({ error: e.message })) : null,
+        wantOnline || $(".firs").checked || needAir ? vatsimOnline().catch((e) => ({ error: e.message })) : null,
         atcPositions(),
+        needAir ? (allSectors ||= api("/api/nav/sectors?fir=EPWW").catch(() => { allSectors = null; return null; })) : null,
       ]);
       layers.sectors.clearLayers();
       layers.firs.clearLayers();
-      if (firs) drawFirs(layers.firs, firs, net?.firs || {}, { panes });
+      // podświetlenie obsady tylko w FIR EPWW; FIR-y sąsiednie jako same kontury
+      const epwwOnline = Object.fromEntries(Object.entries(net?.firs || {}).filter(([id]) => id.startsWith("EPWW")));
+      if (firs) drawFirs(layers.firs, firs, epwwOnline, { panes });
+      drawAirspaceFills(gjAll, positions, net && !net.error ? net.positions : null);
       if (!gj) { $(".sector-info").textContent = ""; return; }
       const online = wantOnline && net && !net.error ? sectorOwners(gj, positions, net.positions) : null;
       drawSectors(layers.sectors, gj, online);
@@ -178,25 +271,34 @@ export default {
     setInterval(() => document.body.contains(pane) && loadSectors(), 60000);
 
     // --- kontrolerzy online: plakietki lotnisk (D/G/T/A/APP) jak w VATSIM Radar; CTR rysuje drawFirs
+    // Plakietki: lotniska w FIR EPWW ze wszystkimi stanowiskami, u sąsiadów tylko APP (koordynacja zbliżania).
+    const badgeFacilities = (ap) => (ap.icao.startsWith("EP") ? ap.facilities : ap.facilities.APP ? { APP: ap.facilities.APP } : null);
     const loadAtc = async () => {
       layers.atc.clearLayers();
-      if (!$(".atc").checked) { atcAds = new Set(); $(".atc-info").textContent = ""; drawAds(); return; }
       try {
-        const data = await vatsimAtc();
-        const known = new Set(ads.map((a) => a.icao));
-        atcAds = new Set(data.airports.map((a) => a.icao));
-        data.airports.forEach((ap) => {
-          // lotniska spoza listy (zagraniczne) dostają sam symbol pod plakietką
-          if (!known.has(ap.icao)) pointMarker({ ident: ap.icao, kind: "AD", lat: ap.lat, lon: ap.lon, name: ap.name }, { label: false, scale: 1.6 }).addTo(layers.atc);
-          const m = airportBadge(ap, panes).addTo(layers.atc);
-          if (ap.icao.startsWith("EP")) m.on("click", () => ctx.open("aerodrome", ap.icao));
-        });
-        $(".atc-info").textContent = `${data.airports.length} lotnisk z kontrolerem · ${hhmm(new Date().toISOString())}`;
-      } catch (e) { atcAds = new Set(); $(".atc-info").innerHTML = `<span class="error">${esc(e.message)}</span>`; }
+        atcData = await vatsimAtc();
+      } catch (e) {
+        atcData = { airports: [] }; atcAds = new Set();
+        $(".atc-info").innerHTML = `<span class="error">${esc(e.message)}</span>`;
+        drawAds();
+        return;
+      }
+      const shown = $(".atc").checked ? atcData.airports.map((ap) => ({ ...ap, facilities: badgeFacilities(ap) })).filter((ap) => ap.facilities) : [];
+      const known = new Set(ads.map((a) => a.icao));
+      atcAds = new Set(shown.map((a) => a.icao));
+      shown.forEach((ap) => {
+        // lotniska spoza listy (zagraniczne) dostają sam symbol pod plakietką
+        if (!known.has(ap.icao)) pointMarker({ ident: ap.icao, kind: "AD", lat: ap.lat, lon: ap.lon, name: ap.name }, { label: false, tooltip: false, scale: 1.6 }).addTo(layers.atc);
+        const m = airportBadge(ap, panes).addTo(layers.atc);
+        m.unbindTooltip();
+        bindAdCard(m, ap.icao, ads.find((a) => a.icao === ap.icao)?.city || ap.name);
+        if (ap.icao.startsWith("EP")) m.on("click", () => ctx.open("aerodrome", ap.icao));
+      });
+      $(".atc-info").textContent = $(".atc").checked ? `${shown.length} lotnisk z kontrolerem · ${hhmm(new Date().toISOString())}` : "";
       drawAds();
     };
     $(".atc").addEventListener("change", loadAtc);
-    setInterval(() => document.body.contains(pane) && $(".atc").checked && loadAtc(), 30000);
+    setInterval(() => document.body.contains(pane) && loadAtc(), 30000);
 
     // --- trasa: gruba linia z obwódką (czytelna na każdym podkładzie), punkty jako symbole z nazwą w ramce
     const drawRoute = (layer, pts, color) => {
@@ -323,7 +425,6 @@ export default {
     $(".clear-route").addEventListener("click", () => { route = null; layers.route.clearLayers(); $(".route-info").textContent = ""; });
 
     setBase(baseName);
-    loadSectors();
     loadTraffic();
     return {
       activate: (arg) => setTimeout(() => {

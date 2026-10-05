@@ -47,6 +47,35 @@ def sections(text: str) -> dict[str, list[str]]:
     return out
 
 
+COORD_TOKEN = re.compile(r"[NS]\d{3}\.\d{1,2}\.\d{1,2}\.\d{1,3}\s+[EW]\d{3}\.\d{1,2}\.\d{1,2}\.\d{1,3}", re.I)
+
+
+def parse_line_groups(lines: list[str]) -> dict[str, list[list[list[float]]]]:
+    """Sekcje [ARTCC], [ARTCC LOW], [ARTCC HIGH]: nazwa i odcinki "lat1 lon1 lat2 lon2 [kolor]".
+
+    Wiersz z nazwą zaczyna grupę, wiersze zaczynające się od spacji ją kontynuują.
+    Wynik: {nazwa: [[[lat1, lon1], [lat2, lon2]], ...]}."""
+    out: dict[str, list] = {}
+    name = None
+    for line in lines:
+        coords = COORD_TOKEN.findall(line)
+        head = line[: line.find(coords[0])].strip() if coords else line.strip()
+        if head and not line[:1].isspace():
+            name = head
+        if name is None or len(coords) < 2:
+            continue
+        pts = []
+        for pair in coords[:2]:
+            lat_s, lon_s = pair.split()
+            lat, lon = parse_coord(lat_s), parse_coord(lon_s)
+            if lat is None or lon is None:
+                break
+            pts.append([lat, lon])
+        if len(pts) == 2:
+            out.setdefault(name, []).append(pts)
+    return out
+
+
 def parse_sct(text: str) -> list[dict]:
     secs = sections(text)
     points = {}

@@ -1,6 +1,6 @@
 import json
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -9,6 +9,7 @@ from ..database import get_db
 from ..importers.seed import init_db
 from ..models import (AircraftType, Aerodrome, AirwaySegment, AtcPosition, Callsign, Document, ImportLog,
                       NavPoint, Sector)
+from ..services import embed
 from ..services.airac import current_airac
 
 router = APIRouter(prefix="/api", tags=["system"])
@@ -28,6 +29,18 @@ def config():
         "carto_api_key": settings.carto_api_key.strip(),
         "metar_source": settings.metar_source,
     }
+
+
+EMBED_LINKS = {"phraseology": "phraseology_url", "inop": "inop_url", "aip_ifr": "aip_ifr_url", "aip_vfr": "aip_vfr_url",
+               "aip_mil": "aip_mil_url", "performance_db": "performance_db_url"}
+
+
+@router.get("/embed-check/{link}")
+async def embed_check(link: str):
+    """Czy strona z linków aplikacji pozwala wyświetlić się w ramce (X-Frame-Options / CSP frame-ancestors)."""
+    if link not in EMBED_LINKS:
+        raise HTTPException(404, f"Nieznany link: {link}")
+    return await embed.check(getattr(settings, EMBED_LINKS[link]))
 
 
 @router.get("/emergency")

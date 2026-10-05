@@ -2,7 +2,7 @@ from datetime import date
 
 from backend.app.importers.ese import parse_ese, parse_vfr_points
 from backend.app.importers.navdata import parse_airways
-from backend.app.importers.sct import parse_coord, parse_sct
+from backend.app.importers.sct import parse_coord, parse_line_groups, parse_sct
 from backend.app.services.airac import current_airac
 from backend.app.services.metar import parse_metar, qfe_from_qnh
 from datetime import datetime, timedelta, timezone
@@ -201,3 +201,19 @@ def test_vfr_points():
 
 def test_gr_operator_info():
     assert parse_gr_operator_info("DHK\tC\nPLF\tMil\nXXX\t?\n") == {"DHK": "CARGO", "PLF": "MIL"}
+
+
+def test_sct_line_groups_and_frame_policy():
+    import httpx
+
+    from backend.app.services.embed import frame_policy
+    lines = ["EPWA TMA OUT          N052.00.00.000 E020.00.00.000 N052.10.00.000 E020.00.00.000 COLOR_TMA",
+             "                      N052.10.00.000 E020.00.00.000 N052.10.00.000 E020.30.00.000 COLOR_TMA",
+             "ZZ_CTR ALL            N050.00.00.000 E019.00.00.000 N050.05.00.000 E019.05.00.000"]
+    g = parse_line_groups(lines)
+    assert list(g) == ["EPWA TMA OUT", "ZZ_CTR ALL"] and len(g["EPWA TMA OUT"]) == 2
+    assert g["EPWA TMA OUT"][1] == [[52.166667, 20.0], [52.166667, 20.5]]
+    assert frame_policy(httpx.Headers({"X-Frame-Options": "SAMEORIGIN"}))[0] is False
+    assert frame_policy(httpx.Headers({"Content-Security-Policy": "frame-ancestors 'self'"}))[0] is False
+    assert frame_policy(httpx.Headers({"Content-Security-Policy": "frame-ancestors *"}))[0] is True
+    assert frame_policy(httpx.Headers({}))[0] is True

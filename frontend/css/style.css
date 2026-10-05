@@ -158,7 +158,7 @@ table.data td.num { text-align: right; font-family: var(--mono); }
 .ad-pane .content { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .ad-pane .metar-head { margin-bottom: 8px; padding: 4px 10px; }
 .ad-grid { flex: 1; min-height: 0; display: grid; gap: 8px;
-  grid-template-columns: 232px minmax(360px, 1.15fr) minmax(290px, 1fr) minmax(250px, 310px); }
+  grid-template-columns: 232px minmax(420px, 1.4fr) minmax(300px, 1fr); }
 .ad-col { display: flex; flex-direction: column; gap: 8px; min-height: 0; min-width: 0; }
 .ad-col > .card { min-height: 0; display: flex; flex-direction: column; padding: 6px 10px; }
 .ad-col > .card h3 { margin-bottom: 4px; flex: none; }
@@ -216,6 +216,18 @@ table.data.rwy-table td.rwy { font: 700 20px var(--mono); color: #fff; }
 table.data.rwy-table tr.inuse td { background: #14240f !important; }
 table.data.rwy-table tr.inuse td.rwy { color: var(--ok); }
 .tag.use { color: var(--ok); border-color: var(--ok); }
+/* role pasa: ARR zielony, DEP niebieski; pełne = z ATIS, przerywane = sugestia vPANDORA */
+.tag.arr { color: #071a00; background: #5fd23a; border-color: #5fd23a; }
+.tag.dep { color: #00191d; background: #3ec7e0; border-color: #3ec7e0; }
+.tag.sugg { background: transparent; border-style: dashed; }
+.tag.arr.sugg { color: #5fd23a; } .tag.dep.sugg { color: #3ec7e0; }
+td.tags .tag { padding: 0 4px; margin-right: 2px; font-size: 11px; }
+.wr-legend { display: flex; justify-content: center; flex-wrap: wrap; gap: 4px 10px; font-size: 11px; color: var(--muted); margin: -4px 0 2px; }
+.wr-legend span { display: inline-flex; align-items: center; gap: 4px; }
+.wr-legend i { display: inline-block; width: 14px; height: 9px; border: 1px solid #fff; }
+.wr-legend .sw-arr { background: #5fd23a; border-color: #5fd23a; } .wr-legend .sw-dep { background: #3ec7e0; border-color: #3ec7e0; }
+.wr-legend .sw-solid { background: #9aa4af; }
+.wr-legend .sw-hatch { background: repeating-linear-gradient(45deg, #9aa4af 0 2px, #151a1f 2px 4px); border-style: dashed; }
 .eq { display: inline-block; margin-right: 4px; padding: 0 4px; font: 12px var(--mono); color: var(--muted); border: 1px solid #3a423a; }
 .eq.ils { color: #fff; border-color: var(--cyan); }
 .rwy-use { margin-top: 10px; padding: 8px; border: 2px solid var(--line); text-align: center; }
@@ -292,6 +304,8 @@ table.data.traffic a.cs { color: var(--cyan); font-weight: 700; text-decoration:
 .swatch.fir { border: 1px dashed #6b756b; }
 .swatch.unicom { background: rgba(85,85,85,.2); border: 1px solid #555; }
 .swatch.awy { height: 0; border-top: 1px solid #5f6b78; border-radius: 0; }
+.swatch.tma { background: rgba(127,149,255,.18); border: 1.5px solid #7f95ff; }
+.swatch.ctr { background: rgba(255,107,107,.22); border: 1.5px dashed #ff6b6b; }
 .seg { display: flex; border: 1px solid #2b333b; border-radius: 5px; overflow: hidden; margin-bottom: 6px; }
 .seg button { flex: 1; background: #12171c; color: #b9c4cd; border: 0; border-right: 1px solid #2b333b; padding: 5px 0; cursor: pointer; font: 12px var(--ui); }
 .seg button:last-child { border-right: 0; }
@@ -428,3 +442,14 @@ table.callsigns td.minor { font-size: 12px; color: var(--muted); }
 .lg-atc { display: flex; flex-wrap: wrap; gap: 4px 10px; }
 .lg-atc > span { display: inline-flex; align-items: center; gap: 5px; }
 .sw .ab { font-size: 10px; }
+
+/* MAP: dymek lotniska (jak karta lotniska w NM UI): ICAO, nazwa, METAR, kontrola, ATIS */
+.leaflet-tooltip.ad-tip { min-width: 320px; max-width: 520px; padding: 8px 10px; }
+.ad-tip .adc-h { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; border-bottom: 1px solid #2a333c; padding-bottom: 4px; margin-bottom: 4px; }
+.ad-tip .adc-h b { font: 700 20px var(--mono); color: #7fc6e8; }
+.ad-tip .adc-h span { font: 700 14px Arial, sans-serif; color: #fff; }
+.ad-tip .adc-sec { margin: 6px 0 2px; font: 700 11px Arial, sans-serif; text-transform: uppercase; letter-spacing: 1px; color: #c8d3dc; }
+.ad-tip .adc-metar { white-space: normal; font: 12px/1.4 var(--mono); }
+.ad-tip .adc-atis { white-space: normal; color: #f3df9a; font: 12px/1.4 var(--mono); }
+.ad-tip table td { padding: 1px 5px 1px 0; }
+.ext-card .mono { word-break: break-all; }
