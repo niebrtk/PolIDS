@@ -65,6 +65,10 @@ Skopiuj `.env.example` do `.env`. Najważniejsze: domyślne lotnisko, źródło 
 serwer NOTAM, klucz OpenAIP do nakładki lotniczej na mapie i opcjonalny klucz CARTO do podkładów mapy.
 
 Klucze API wpisuj tylko w lokalnym pliku `.env` (jest w `.gitignore`), np. `VPANDORA_CARTO_API_KEY=...`.
+Jeśli za każdym razem pobierasz nowy ZIP do nowego folderu, plik `.env` zostaje w starym folderze. Wtedy wygodniej
+ustawić klucz raz jako zmienną środowiskową Windows (w oknie `cmd`): `setx VPANDORA_CARTO_API_KEY twoj_klucz`,
+a potem uruchomić `run.bat` od nowa. Zakładka **?** pokazuje, czy klucz został wczytany.
+Plik `.venv\pyvenv.cfg` to konfiguracja środowiska Pythona, aplikacja go nie czyta.
 Repozytorium jest publiczne, więc klucze nie powinny trafiać do żadnego pliku w repo.
 
 ### Aktualizacja danych

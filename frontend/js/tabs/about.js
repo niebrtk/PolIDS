@@ -33,6 +33,8 @@ export default {
         Cykl AIRAC: ${esc(ctx.config.airac.ident)} (od ${esc(ctx.config.airac.effective)})<br><br>
         Dane: ${c.aerodromes ?? "–"} lotnisk, ${c.aircraft_types ?? "–"} typów samolotów, ${c.callsigns ?? "–"} callsignów,<br>
         ${c.nav_points ?? "–"} punktów, ${c.airway_segments ?? "–"} odcinków dróg, ${c.sectors ?? "–"} sektorów, ${c.atc_positions ?? "–"} stanowisk ATC<br><br>
+        Klucz CARTO: ${ctx.config.carto_api_key ? "wczytany" : "brak (podkłady CARTO działają też bez niego)"}<br>
+        Klucz OpenAIP: ${ctx.config.openaip_api_key ? "wczytany" : "brak"}<br><br>
         API: <a href="/docs" target="_blank">/docs</a>`;
     };
     return { activate: load };
