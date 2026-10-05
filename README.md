@@ -12,14 +12,14 @@ Wygląd wzorowany na PANDORZE: czarne tło, kolumna zielonych przycisków menu i
 | **?** | wersja, AIRAC, stan bazy, ostatnie zmiany | API |
 | **RADIO** | EPWW ACC (lista CTR i polskich FIS + mapa sektorów z obsadą), lotniska (IFR, VFR, MIL) w jednej kolumnie, każdy FIR sąsiedni osobno (najpierw ACC/CTR); podświetlenie kto jest online i rezerwacji na bieżącą dobę UTC | `.ese`, [VATSIM data feed i ATC bookings](https://vatsim.dev/services/apis), granice FIR z VATSpy |
 | **METEO** | METAR PL / MIL / INTL, TAF PL / INTL (kolorowane, okresy zmian w osobnych liniach), mapa QNH jak w PANDORZE, Windy (wiatr, radar, satelita) | metar.vatsim.net / aviationweather.gov |
-| **AERODROME** | jeden ekran bez przewijania (długie listy przewijają się w swoich okienkach). AWOS: róża wiatrów z zaznaczonym kierunkiem pasa, QNH/QFE, widzialność, chmury, RVR, składowe wiatru, **pas w użyciu z ATIS** albo **pas preferowany** (wiatr, ILS, LVP), **wskaźnik LVP z powodem**, wiek METAR, TAF, ATIS, ruch VATSIM (przyloty, odloty, prefile), NOTAM-y lotniska z czasem ważności i sortowaniem, częstotliwości z obsadą i rezerwacjami, checklista *Open position* | METAR/TAF jw., NOTAM z cv.plvacc.pl, VATSIM, pasy z OurAirports, podejścia (ILS) z procedur w `.ese`, `data/seed/runway_config.json`, progi LVP w `data/seed/lvp.json` |
+| **AERODROME** | jeden ekran bez przewijania, trzy kolumny (długie listy przewijają się w swoich okienkach). AWOS: róża wiatrów (kolor = ARR/DEP, pełne wypełnienie = pas z ATIS, kreskowane = pas sugerowany przez vPANDORA), QNH/QFE, widzialność, chmury, RVR, tabela pasów ze składowymi wiatru w kt, **pas w użyciu z ATIS** albo **pas preferowany** (wiatr, ILS, LVP), **wskaźnik LVP z powodem**, wiek METAR, TAF, ATIS, ruch VATSIM: przyloty, prefile i **odloty z danymi vIFF** (EOBT, CTOT, status lotu jak w liście lotów NM: FI / SI / FLS / OB / TA, a na EPWA z A-CDM także TOBT, TSAT, AOBT, TTOT), NOTAM-y lotniska z czasem ważności i sortowaniem, częstotliwości z obsadą i rezerwacjami | METAR/TAF jw., NOTAM z cv.plvacc.pl, VATSIM, [vIFF](https://api.viffsys.com/docs), pasy z OurAirports, podejścia (ILS) z procedur w `.ese`, `data/seed/runway_config.json`, progi LVP w `data/seed/lvp.json` |
 | **AD CIV / AD MIL / AD VFR** | eAIP PAŻP | iframe + „otwórz w nowej karcie” |
 | **CALLSIGN** | baza callsignów, podmenu A–Z, oznaczenie CARGO / MILITARY | `ICAO_Airlines.txt`, `GRpluginOperatorInfo.txt` |
 | **AIRCRAFT** | typy: WTC, RECAT-EU, wymiary, MTOW, zdjęcie, link do EUROCONTROL Aircraft Performance Database, podmenu A–Z | aircraft-database.com + `ICAO_Aircraft.json`, zdjęcia w `data/photos/` (brakujące pobierane raz z Wikipedii) |
-| **MAP** | sektory EPWW na wybranym FL z aktualną obsadą, FIR-y sąsiednie online, samoloty z VATSIM (kliknięcie = plan lotu i trasa), trasa z planu lotu po drogach lotniczych, lotniska / VOR / NDB / FIX / punkty VFR symbolami EuroScope, **plakietki kontrolerów online jak w VATSIM Radar** (przy lotnisku D = Delivery, G = Ground, T = Tower, A = ATIS, APP = Approach/Departure; przy FIR-ze CTR; po najechaniu: kto, częstotliwość, CID, rating, od kiedy, tekst ATIS), podkład ciemny, jasny, biały albo OSM | `.sct`, `.ese`, `airway.txt`, `isec.txt`, VATSIM, VATSpy |
+| **MAP** | sektory EPWW na wybranym FL z aktualną obsadą, **TMA i CTR** (kontury z `.sct`, wypełnione, gdy APP / TWR jest online), FIR-y sąsiednie jako kontury, samoloty z VATSIM jako sylwetki samolotów (kliknięcie = plan lotu i trasa), trasa z planu lotu po drogach lotniczych, lotniska / VOR / NDB / FIX / punkty VFR symbolami EuroScope (VOR i NDB domyślnie wyłączone), **plakietki kontrolerów online jak w VATSIM Radar** (w FIR EPWW wszystkie: D = Delivery, G = Ground, T = Tower, A = ATIS, APP; u sąsiadów tylko APP; CTR przy FIR EPWW), **karta lotniska po najechaniu** (ICAO, nazwa, METAR, kto jest online, ATIS), **ruch vs przepustowość sektorów z vIFF na godzinę naprzód** (lista najbardziej obciążonych, wykres wejść na godzinę i liczby samolotów w sektorze minuta po minucie, obrys sektora na mapie), podkład ciemny, jasny, biały albo OSM | `.sct`, `.ese`, `airway.txt`, `isec.txt`, VATSIM, VATSpy, vIFF |
 | **INOP** | om.plvacc.pl | iframe |
 | **DOCS** | PDF-y z folderu `data/docs/` otwierane w aplikacji | `data/docs/` |
-| **PHRASEOLOGY** | frazeologia EUROCONTROL Learning Zone | przycisk „otwórz w nowej karcie” (serwis nie pozwala osadzać się w ramce) |
+| **PHRASEOLOGY** | „Say Again? The Phraseology Database” z EUROCONTROL Learning Zone (link pełnoekranowy) | aplikacja sprawdza nagłówki strony: ramka, jeśli serwis na nią pozwala, inaczej przycisk „otwórz w nowej karcie” (dziś Learning Zone blokuje ramki: X-Frame-Options SAMEORIGIN) |
 | **CHECKLIST** | Open position, Close position, Handover/takeover, Runway change (zaznaczenia zostają w przeglądarce) | `data/seed/checklists.json` (z vatiris) |
 | **EMERGENCY** | procedury awaryjne do wyboru: ASSIST, A06 i 16 checklist EUROCONTROL, każda w jednej kolumnie (czerwona ramka) | `data/seed/emergency.json` |
 
@@ -144,6 +144,10 @@ vpandora/
 - Parser ATIS rozpoznaje typowe formaty vATIS; przy nietypowym tekście pokazuje pas preferowany i informację, że ATIS jest online.
 - EUROCONTROL Learning Zone odrzuca wyświetlanie w ramce, dlatego frazeologia i baza osiągów otwierają się w nowej karcie
   (link do osiągów: `.../ATCPFDB/details.aspx?ICAO=<kod>`).
+- vIFF (api.viffsys.com) nie publikuje schematów odpowiedzi; pola odczytujemy tak, jak je zwraca API (stan z 05.10.2026).
+  Odczyt działa bez klucza. TOBT/TSAT/TTOT pojawiają się tylko wtedy, gdy kontroler na EPWA prowadzi CDM we wtyczce EuroScope.
+  Godziny w vIFF nie mają daty, więc przejście przez północ liczymy względem bieżącej godziny UTC. Obrys sektora na mapie
+  pokazuje zasięg poziomy sektora EPWW (wszystkie warstwy), bez podziału na poziomy H/M/L.
 - Plakietki ATC na mapie stawiamy tylko przy lotniskach, które są w bazie punktów (navdata EuroScope); stanowiska
   z prefiksem innym niż kod ICAO lotniska (np. 3-literowe z USA) są pomijane.
 - QFE liczone w przybliżeniu z QNH i elewacji lotniska.
@@ -158,6 +162,7 @@ vpandora/
   [vatger/atciss](https://github.com/vatger/atciss) (MIT).
 - Lotniska, pasy, pomoce nawigacyjne: [OurAirports](https://ourairports.com/data/) (domena publiczna).
 - Leaflet (BSD-2), podkład CARTO/OpenStreetMap (ODbL), zastępczy podkład Esri World Gray Canvas (Esri, HERE, Garmin, OSM).
+- Dane ATFCM/CDM (CTOT, status lotu, A-CDM, przepustowość sektorów): [vIFF](https://viffsys.com) (Roger Puig), tylko odczyt.
 - Granice FIR: [vatsimnetwork/vatspy-data-project](https://github.com/vatsimnetwork/vatspy-data-project) (CC BY-SA 4.0), plik `data/seed/vatspy_firs.geojson`.
 - Zdjęcia samolotów pobierane z Wikipedii; autor i licencja są na stronie artykułu podlinkowanej pod zdjęciem.
 - Pliki EuroScope (pakiet sektorowy PL vACC / GNG) są w `data/import/`, PDF-y w `data/docs/`.

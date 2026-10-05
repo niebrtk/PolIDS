@@ -1,4 +1,5 @@
 import { BASEMAPS, LIGHT_BASEMAPS, api, atcPositions, esc, h, hhmm, vatsimAtc, vatsimOnline } from "../api.js";
+import { chartHtml, listRow, loadRatio, tvGroup, tvLabel } from "../viffchart.js";
 import { FACILITIES, PLANE_PATH, SymbolMarker, aircraftMarker, airportBadge, atcPanes, drawFirs, drawSectors, fl, loadFirs, sectorOwners, symbolFor, symbolSvg } from "../airspace.js";
 
 // Kolory zależne od podkładu (ciemny / jasny)
@@ -44,6 +45,13 @@ export default {
           <div class="sector-info hint"></div>
         </section>
         <section class="ms-card">
+          <h4>Przepustowość sektorów (vIFF)</h4>
+          ${sw("viff", "ruch i przepustowość na godzinę naprzód", true, `<span class="swatch viff"></span>`)}
+          <select class="field viff-tv"><option value="">wybierz sektor…</option></select>
+          <div class="viff-list"></div>
+          <div class="viff-info hint"></div>
+        </section>
+        <section class="ms-card">
           <h4>Punkty i drogi</h4>
           ${sw("ads", "lotniska", true, `<i data-sym="aerodrome"></i>`)}
           ${sw("navaids", "VOR / DME", false, `<i data-sym="vor"></i>`)}
@@ -68,6 +76,7 @@ export default {
           <div class="lg"><span class="swatch tma"></span>TMA (wypełniona, gdy APP online)</div>
           <div class="lg"><span class="swatch ctr"></span>CTR (wypełniona, gdy TWR online)</div>
           <div class="lg"><span class="swatch unicom"></span>sektor bez kontrolera (UNICOM 122.800)</div>
+          <div class="lg"><span class="swatch viff"></span>sektor wybrany na wykresie vIFF</div>
           <div class="lg"><span class="lg-freq">133.475</span>częstotliwość obsadzonego sektora</div>
           <div class="lg lg-atc">${FACILITIES.map(([k, l, n]) => `<span><span class="ab ab-${k.toLowerCase()}">${l}</span>${n}</span>`).join("")}
             <span><span class="ab ab-ctr">CTR</span>Control (FIR)</span></div>
@@ -90,7 +99,7 @@ export default {
       firs: L.layerGroup().addTo(map), sectors: L.layerGroup().addTo(map), airways: L.layerGroup(),
       airOn: L.layerGroup().addTo(map), tma: L.layerGroup().addTo(map), ctrs: L.layerGroup().addTo(map),
       ads: L.layerGroup().addTo(map), points: L.layerGroup().addTo(map), route: L.layerGroup().addTo(map), atc: L.layerGroup().addTo(map),
-      traffic: L.layerGroup().addTo(map), flight: L.layerGroup().addTo(map),
+      traffic: L.layerGroup().addTo(map), flight: L.layerGroup().addTo(map), viff: L.layerGroup().addTo(map),
     };
     let openaip = null;
     const panes = atcPanes(map);
@@ -269,6 +278,76 @@ export default {
     $(".fl").addEventListener("change", loadSectors);
     setInterval(() => document.body.contains(pane) && loadSectors(), 60000);
 
+    // --- vIFF: ruch vs przepustowość sektorów (traffic volumes) na godzinę naprzód.
+    // Lista najbardziej obciążonych sektorów w panelu, wykres wybranego sektora na mapie, obrys sektora na mapie.
+    let viffData = null;
+    let viffSel = localStorage.getItem("map.viff.tv") ?? null;
+    const chart = L.control({ position: "bottomleft" });
+    chart.onAdd = () => {
+      const el = L.DomUtil.create("div", "viff-chart");
+      L.DomEvent.disableClickPropagation(el);
+      L.DomEvent.disableScrollPropagation(el);
+      el.addEventListener("click", (e) => { if (e.target.closest(".vf-close")) selectTv(""); });
+      return el;
+    };
+    chart.addTo(map);
+    const chartEl = chart.getContainer();
+    // obrys: litera sektora EPWW (EPWW-BH → sektory EPWWB na wszystkich poziomach) albo TMA lotniska (EPWA-TMA)
+    const drawTvArea = async (tv) => {
+      layers.viff.clearLayers();
+      if (!tv) return;
+      const [secs, tma] = await Promise.all([allSectors ||= api("/api/nav/sectors?fir=EPWW").catch(() => { allSectors = null; return null; }), airspaceLines.tma]);
+      const feats = [];
+      tv.volumes.forEach((v) => {
+        const [area, part = ""] = v.split("-");
+        if (area === "EPWW" && /^[A-Z]/.test(part)) {
+          const n = "EPWW" + part[0];
+          feats.push(...(secs?.features || []).filter((f) => f.properties.name === n || f.properties.name.startsWith(n + "-")));
+        } else if (/TMA/.test(part)) {
+          feats.push(...(tma?.features || []).filter((f) => f.properties.name.startsWith(area + " ") && !f.properties.inner));
+          feats.push(...(secs?.features || []).filter((f) => f.properties.name.startsWith(area + "_") && /TMA/.test(f.properties.name)));
+        }
+      });
+      if (viffSel !== tv.id) return;
+      L.geoJSON({ type: "FeatureCollection", features: feats }, { interactive: false,
+        style: { color: "#ffd400", weight: 2.6, opacity: 0.95, fillColor: "#ffd400", fillOpacity: 0.025 } }).addTo(layers.viff);
+    };
+    const drawViff = () => {
+      const list = viffData?.sectors || [];
+      const tv = list.find((t) => t.id === viffSel);
+      const groups = {};
+      list.forEach((t) => (groups[tvGroup(t)] ||= []).push(t));
+      $(".viff-tv").innerHTML = `<option value="">wybierz sektor…</option>` + Object.entries(groups).map(([g, ts]) =>
+        `<optgroup label="${esc(g)}">${ts.map((t) => `<option value="${esc(t.id)}" ${t.id === viffSel ? "selected" : ""}>${esc(t.id)} · ${esc(tvLabel(t.id))}</option>`).join("")}</optgroup>`).join("");
+      const top = [...list].sort((a, b) => loadRatio(b) - loadRatio(a)).slice(0, 6);
+      $(".viff-list").innerHTML = top.length ? `<div class="hint">Najbardziej obciążone w ciągu godziny (wejścia / przepustowość na godzinę):</div>${top.map((t) => listRow(t, viffSel)).join("")}` : "";
+      chartEl.style.display = tv && $(".viff").checked ? "" : "none";
+      chartEl.innerHTML = tv ? chartHtml(tv, viffData.now) : "";
+      drawTvArea($(".viff").checked ? tv : null);
+    };
+    const selectTv = (id) => {
+      viffSel = id;
+      try { localStorage.setItem("map.viff.tv", id); } catch { /* tryb prywatny */ }
+      drawViff();
+    };
+    const loadViff = async () => {
+      if (!$(".viff").checked) { chartEl.style.display = "none"; layers.viff.clearLayers(); $(".viff-list").innerHTML = ""; $(".viff-info").textContent = ""; return; }
+      try {
+        viffData = await api("/api/viff/sectors");
+        // pierwszy raz: od razu wykres najbardziej obciążonego sektora
+        if (viffSel === null && viffData.sectors.length) viffSel = [...viffData.sectors].sort((a, b) => loadRatio(b) - loadRatio(a))[0].id;
+        $(".viff-info").textContent = `${viffData.sectors.length} sektorów vIFF · ${viffData.now.slice(0, 2)}:${viffData.now.slice(2)}Z`;
+      } catch (e) {
+        viffData = null;
+        $(".viff-info").innerHTML = `<span class="error">${esc(e.message)}</span>`;
+      }
+      drawViff();
+    };
+    $(".viff").addEventListener("change", loadViff);
+    $(".viff-tv").addEventListener("change", (e) => selectTv(e.target.value));
+    $(".viff-list").addEventListener("click", (e) => { const b = e.target.closest("[data-tv]"); if (b) selectTv(b.dataset.tv); });
+    setInterval(() => document.body.contains(pane) && $(".viff").checked && loadViff(), 60000);
+
     // --- kontrolerzy online: plakietki lotnisk (D/G/T/A/APP) jak w VATSIM Radar; CTR rysuje drawFirs
     // Plakietki: lotniska w FIR EPWW ze wszystkimi stanowiskami, u sąsiadów tylko APP (koordynacja zbliżania).
     const badgeFacilities = (ap) => (ap.icao.startsWith("EP") ? ap.facilities : ap.facilities.APP ? { APP: ap.facilities.APP } : null);
@@ -425,6 +504,7 @@ export default {
 
     setBase(baseName);
     loadTraffic();
+    loadViff();
     return {
       activate: (arg) => setTimeout(() => {
         map.invalidateSize();

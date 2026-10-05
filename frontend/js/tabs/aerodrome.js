@@ -168,21 +168,46 @@ const NOTAM_SORT = {
   end: (a, b) => (a.perm - b.perm) || (a.end || "9").localeCompare(b.end || "9"),
 };
 
-// Ruch z sieci VATSIM: przyloty, odloty, plany złożone przed połączeniem
-function trafficHtml(t, icao) {
+// Ruch z sieci VATSIM: przyloty, odloty, plany złożone przed połączeniem.
+// Odloty uzupełnia vIFF (jak lista lotów NM UI): EOBT, CTOT i status lotu, a na lotnisku z A-CDM (EPWA)
+// także TOBT, TSAT, AOBT i TTOT.
+const STATE_CLASS = { FI: "fi", SI: "si", SUSP: "susp", OB: "ob", TA: "ta" };
+const t4 = (v) => (v ? esc(v) : "–");
+function viffState(v, states) {
+  if (!v) return `<span class="hint">–</span>`;
+  const label = v.state === "SUSP" && v.suspension ? v.suspension : v.state;
+  const tip = [states?.[v.state] || v.state, v.atfcm_status && `vIFF: ${v.atfcm_status}`, v.cdm_status && v.cdm_status !== v.atfcm_status && `CDM: ${v.cdm_status}`,
+    v.regulation && `regulacja ${v.regulation}`, v.dep_info && `pas/SID ${v.dep_info}`].filter(Boolean).join(" · ");
+  return `<span class="fs fs-${STATE_CLASS[v.state] || "fi"}" title="${esc(tip)}">${esc(label)}</span>${v.ready ? ` <span class="fs fs-rea" title="REA: gotowy do odlotu przed slotem">REA</span>` : ""}`;
+}
+function trafficHtml(t, icao, viff) {
   const fl = (a) => (a === null || a === undefined ? "–" : a >= 6000 ? "FL" + String(Math.round(a / 100)).padStart(3, "0") : a + " ft");
   const cs = (p) => `<a href="#map/${encodeURIComponent(p.callsign)}" class="cs">${esc(p.callsign)}</a>`;
   const arr = t.arrivals.map((p) => `<tr><td>${cs(p)}</td><td>${esc(p.aircraft || "–")}</td><td>${esc(p.departure || "?")}</td>
     <td class="num">${p.state === "ground" ? "na ziemi" : fl(p.altitude)}</td><td class="num">${p.groundspeed ?? "–"}</td>
     <td class="num">${p.dist_nm ?? "–"}</td><td class="num">${p.eta_min !== null && p.eta_min !== undefined ? p.eta_min + " min" : "–"}</td></tr>`).join("");
-  const dep = t.departures.map((p) => `<tr><td>${cs(p)}</td><td>${esc(p.aircraft || "–")}</td><td>${esc(p.arrival || "?")}</td>
-    <td class="num">${p.state === "ground" ? "na ziemi" : fl(p.altitude)}</td><td class="num">${p.groundspeed ?? "–"}</td>
-    <td class="num">${p.dist_nm ?? "–"}</td><td>${esc(p.rfl ? "RFL " + p.rfl : "")}</td></tr>`).join("");
+  // odloty: lista VATSIM + loty, które zna tylko vIFF (np. złożony plan, pilot jeszcze nie połączony)
+  const vmap = Object.fromEntries((viff?.flights || []).map((f) => [f.callsign, f]));
+  const prefiles = Object.fromEntries(t.prefiles.map((p) => [p.callsign, p]));
+  const depRows = t.departures.map((p) => ({ p, v: vmap[p.callsign] }));
+  const known = new Set(t.departures.map((p) => p.callsign));
+  (viff?.flights || []).filter((f) => !known.has(f.callsign))
+    .forEach((f) => depRows.push({ p: { callsign: f.callsign, aircraft: prefiles[f.callsign]?.aircraft, arrival: f.arrival, dist_nm: null, offline: true }, v: f }));
+  const order = (r) => (r.v?.state === "TA" || (r.p.state === "air" && !r.v) ? "2" : "1") + (r.v?.tsat || r.v?.tobt || r.v?.eobt || "9999");
+  depRows.sort((a, b) => order(a).localeCompare(order(b)));
+  const cdm = viff?.cdm;
+  const ctot = (v) => (v?.ctot ? `<span class="ctot" title="${esc([v.regulation && "regulacja " + v.regulation, v.airspace && "przestrzeń " + v.airspace].filter(Boolean).join(" · ") || "CTOT")}">${esc(v.ctot)}</span>` : "–");
+  const dep = depRows.map(({ p, v }) => `<tr class="${p.offline ? "offline" : ""}"><td>${p.offline ? esc(p.callsign) : cs(p)}</td><td>${esc(p.aircraft || "–")}</td><td>${esc(p.arrival || "?")}</td>
+    <td class="num">${t4(v?.eobt)}</td>${cdm ? `<td class="num">${t4(v?.tobt)}</td><td class="num">${t4(v?.tsat)}</td><td class="num">${t4(v?.aobt)}</td><td class="num">${t4(v?.ttot)}</td>` : ""}
+    <td class="num">${ctot(v)}</td><td>${viffState(v, viff?.states)}</td><td class="num">${p.offline ? "offline" : p.dist_nm ?? "–"}</td></tr>`).join("");
   const pre = t.prefiles.map((p) => `${esc(p.callsign)} ${esc(p.aircraft || "")} ${esc(p.departure || "")}→${esc(p.arrival || "")}${p.deptime ? " " + esc(p.deptime) + "Z" : ""}`).join(" · ");
   const table = (title, n, head, rows) => `<h4>${title} <span class="hint">(${n})</span></h4>${n
     ? `<table class="data traffic"><thead><tr>${head.map((x) => `<th>${x}</th>`).join("")}</tr></thead><tbody>${rows}</tbody></table>` : `<div class="hint">brak</div>`}`;
+  const depHead = ["Callsign", "Typ", "Do", "EOBT", ...(cdm ? ["TOBT", "TSAT", "AOBT", "TTOT"] : []), "CTOT", "Status", "NM"];
+  const viffNote = viff?.error ? `<div class="hint viff-note">vIFF niedostępny (${esc(viff.error)}): EOBT, CTOT i status pojawią się, gdy wróci.</div>`
+    : `<div class="hint viff-note">EOBT/CTOT/status z vIFF${cdm ? " · A-CDM: TOBT, TSAT, AOBT, TTOT" : ""} · FI złożony · SI slot (CTOT) · FLS zawieszony · OB ruszył z postoju · TA w powietrzu · REA gotowy wcześniej</div>`;
   return table(`Przyloty do ${esc(icao)}`, t.arrivals.length, ["Callsign", "Typ", "Z", "Poziom", "GS", "NM", "ETA"], arr)
-    + table(`Odloty z ${esc(icao)}`, t.departures.length, ["Callsign", "Typ", "Do", "Poziom", "GS", "NM", ""], dep)
+    + table(`Odloty z ${esc(icao)}`, depRows.length, depHead, dep) + viffNote
     + (pre ? `<h4>Prefile <span class="hint">(${t.prefiles.length})</span></h4><div class="mono hint">${pre}</div>` : "");
 }
 
@@ -223,7 +248,9 @@ export default {
 
     const renderTraffic = async (el) => {
       try {
-        el.innerHTML = trafficHtml(await api(`/api/vatsim/airport/${icao}`), icao);
+        const [t, viff] = await Promise.all([api(`/api/vatsim/airport/${icao}`),
+          api(`/api/viff/departures/${icao}`).catch((e) => ({ error: e.message, flights: [] }))]);
+        el.innerHTML = trafficHtml(t, icao, viff);
       } catch (e) { el.innerHTML = `<span class="error">${esc(e.message)}</span>`; }
     };
 

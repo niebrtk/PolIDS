@@ -132,3 +132,30 @@ def test_airspace_lines_and_embed_check(client):
     assert ctr["features"] and ctr["features"][0]["geometry"]["type"] == "MultiLineString"
     assert client.get("/api/nav/airspace?kind=xyz").status_code == 422
     assert client.get("/api/embed-check/nieznany").status_code == 404
+
+
+def test_viff_endpoints(client, monkeypatch):
+    from backend.app.services import viff
+    from backend.app.services.http_cache import UpstreamError
+
+    flight = {"callsign": "LOT3827", "arrival": "EPGD", "eobt": "1520", "ctot": "1545", "atfcmStatus": "SAM",
+              "cdmSts": "", "aobt": "", "atot": "", "atfcmData": {"mostPenalisingRegulation": "EPWWB15"},
+              "cdmData": {"tobt": "152000", "tsat": "153000", "ttot": "154500", "depInfo": "29/LIMVI2G"}}
+
+    async def fake_get(path, params=None, ttl=None):
+        return {"/ifps/depAirport": [flight], "/etfms/getCadAirport": {"isCdm": True},
+                "/etfms/trafficVolumes": [], "/etfms/airspaces": {}}[path]
+
+    monkeypatch.setattr(viff, "_get", fake_get)
+    d = client.get("/api/viff/departures/epwa").json()
+    assert d["cdm"] is True and d["flights"][0]["state"] == "SI"
+    assert (d["flights"][0]["tsat"], d["flights"][0]["regulation"]) == ("1530", "EPWWB15")
+    assert client.get("/api/viff/departures/EPWA1").status_code == 400
+    assert client.get("/api/viff/sectors").json()["sectors"] == []
+
+    async def down(path, params=None, ttl=None):
+        raise UpstreamError("timeout")
+
+    monkeypatch.setattr(viff, "_get", down)
+    r = client.get("/api/viff/departures/EPWA")
+    assert r.status_code == 502 and "vIFF" in r.json()["detail"]

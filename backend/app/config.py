@@ -52,5 +52,15 @@ class Settings(BaseSettings):
     # Klucz CARTO do podkładów mapy (opcjonalny; trzymaj go tylko w lokalnym pliku .env, nie w repozytorium)
     carto_api_key: str = ""
 
+    # vIFF (VATSIM IFPS/ETFMS/CDM, https://api.viffsys.com): odloty z EOBT/CTOT/statusem i ruch vs przepustowość sektorów.
+    # Odczyt działa bez klucza. Klucz (nagłówek x-api-key) ustaw tylko, jeśli dostaniesz go od autora vIFF.
+    viff_url: str = "https://api.viffsys.com"
+    viff_api_key: str = ""
+    viff_cache_seconds: int = 60
+    # Lotniska z A-CDM (TOBT/TSAT/TTOT); vIFF podaje to też sam (isCdm), ta lista jest zapasowa
+    viff_cdm_airports: str = "EPWA"
+    # Prefiks "traffic volumes" (sektorów) vIFF dla FIR EPWW
+    viff_sector_prefix: str = "EP"
+
 
 settings = Settings()

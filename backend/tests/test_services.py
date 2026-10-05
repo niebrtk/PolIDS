@@ -217,3 +217,30 @@ def test_sct_line_groups_and_frame_policy():
     assert frame_policy(httpx.Headers({"Content-Security-Policy": "frame-ancestors 'self'"}))[0] is False
     assert frame_policy(httpx.Headers({"Content-Security-Policy": "frame-ancestors *"}))[0] is True
     assert frame_policy(httpx.Headers({}))[0] is True
+
+
+def test_viff_departure_states_and_sector_load():
+    from backend.app.services.viff import departure, hhmm, sector_load
+
+    assert (hhmm("152000"), hhmm("1520"), hhmm(""), hhmm(None)) == ("1520", "1520", None, None)
+    base = {"callsign": "X", "eobt": "1500", "ctot": "", "aobt": "", "atot": "", "atfcmStatus": "", "cdmSts": ""}
+    assert departure(base)["state"] == "FI"
+    assert departure({**base, "ctot": "1530", "atfcmStatus": "SAM"})["state"] == "SI"
+    susp = departure({**base, "atfcmStatus": "FLS-NRA"})
+    assert (susp["state"], susp["suspension"]) == ("SUSP", "FLS-NRA")
+    assert departure({**base, "aobt": "1505", "atfcmStatus": "ATC_ACTIV"})["state"] == "OB"
+    assert departure({**base, "atot": "1512"})["state"] == "TA"
+    assert departure({**base, "cdmSts": "REA"})["ready"] is True
+
+    # 23:50Z: lot wchodzi 23:55 i wychodzi 00:10 (przez północ), drugi 00:30-00:40, trzeci już wyszedł
+    now = datetime(2026, 10, 5, 23, 50, tzinfo=timezone.utc)
+    buckets = [{"hour": "23", "entriesCapacity": 30, "peakCapacity": 999, "entriesCount": 2, "peakCount": 1, "active": False,
+                "flights": [["AAA1", "2355", "0010", "2355", "0010", True], ["CCC3", "2330", "2340", "2330", "2340", True]]},
+               {"hour": "00", "entriesCapacity": 30, "peakCapacity": 999, "entriesCount": 1, "peakCount": 1, "active": False,
+                "flights": [["BBB2", "0025", "0035", "0030", "0040", False]]}]
+    s = sector_load("EP-BH", buckets, now)
+    assert [f["callsign"] for f in s["flights"]] == ["AAA1", "BBB2"]
+    assert [w["entries"] for w in s["windows"]] == [1, 0, 1]   # 23:50-00:10, 00:10-00:30, 00:30-00:50
+    assert s["occupancy"][5] == 1 and s["occupancy"][19] == 1 and s["occupancy"][20] == 0
+    assert s["peak_60"] == 1 and s["hours"][0]["entries_cap"] == 30 and s["hours"][0]["peak_cap"] is None
+    assert s["flights"][1]["entry"] == "0030"

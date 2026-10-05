@@ -1,6 +1,8 @@
 import { api, esc, h } from "../api.js";
 
 const CHANGES = [
+  ["05.10.2026", "AERODROME: odloty z vIFF (EOBT, CTOT, status lotu, na EPWA TOBT/TSAT/AOBT/TTOT) zamiast RFL/GS/poziomu, bez checklisty, kt w tabeli pasów, róża wiatrów z ARR/DEP i pasem sugerowanym (kreskowanie)."],
+  ["05.10.2026", "MAP: TMA i CTR, ruch vs przepustowość sektorów z vIFF na godzinę naprzód, sylwetki samolotów, karta lotniska z METAR, kontrolerami i ATIS, plakietki tylko w FIR EPWW, VOR/NDB domyślnie ukryte."],
   ["05.10.2026", "MAP: plakietki kontrolerów online jak w VATSIM Radar (D/G/T/A/APP przy lotnisku, CTR przy FIR) z dymkiem, częstotliwości bez poświaty."],
   ["05.10.2026", "AERODROME: wszystko na jednym ekranie. EMERGENCY w jednej kolumnie. PHRASEOLOGY otwiera się w nowej karcie."],
   ["05.10.2026", "EMERGENCY: 16 checklist EUROCONTROL + ASSIST. Nowe zakładki CHECKLIST (vatiris) i PHRASEOLOGY."],
@@ -29,7 +31,7 @@ export default {
       const st = await api("/api/status").catch(() => ({ counts: {} }));
       const c = st.counts;
       pane.querySelector(".info").innerHTML = `
-        Wersja oprogramowania: 0.5.0<br>
+        Wersja oprogramowania: 0.6.0<br>
         Cykl AIRAC: ${esc(ctx.config.airac.ident)} (od ${esc(ctx.config.airac.effective)})<br><br>
         Dane: ${c.aerodromes ?? "–"} lotnisk, ${c.aircraft_types ?? "–"} typów samolotów, ${c.callsigns ?? "–"} callsignów,<br>
         ${c.nav_points ?? "–"} punktów, ${c.airway_segments ?? "–"} odcinków dróg, ${c.sectors ?? "–"} sektorów, ${c.atc_positions ?? "–"} stanowisk ATC<br><br>

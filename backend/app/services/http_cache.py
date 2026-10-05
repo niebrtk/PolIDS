@@ -13,14 +13,14 @@ class UpstreamError(Exception):
     pass
 
 
-async def fetch_text(url: str, ttl: int, params: dict | None = None) -> str:
+async def fetch_text(url: str, ttl: int, params: dict | None = None, headers: dict | None = None) -> str:
     key = url + "?" + "&".join(f"{k}={v}" for k, v in sorted((params or {}).items()))
     hit = _cache.get(key)
     if hit and time.monotonic() - hit[0] < ttl:
         return hit[1]
     try:
         async with httpx.AsyncClient(timeout=settings.http_timeout, follow_redirects=True,
-                                     headers={"User-Agent": "vPANDORA/0.1 (VATSIM PL vACC)"}) as client:
+                                     headers={"User-Agent": "vPANDORA/0.1 (VATSIM PL vACC)", **(headers or {})}) as client:
             resp = await client.get(url, params=params)
             resp.raise_for_status()
     except httpx.HTTPError as exc:

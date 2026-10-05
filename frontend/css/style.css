@@ -458,3 +458,50 @@ table.callsigns td.minor { font-size: 12px; color: var(--muted); }
 .ad-tip td.cs { color: #0b3d91; font-weight: 700; }
 .ad-tip td.fq { color: #1a7f2e; font-weight: 700; }
 .ad-tip .muted { color: #6b7680; }
+
+/* status lotu z vIFF (jak lista lotów NM UI) */
+.fs { display: inline-block; padding: 0 4px; border-radius: 3px; font: 700 11px var(--mono); border: 1px solid; cursor: help; }
+.fs-fi { color: #aab4bd; border-color: #56606a; }
+.fs-si { color: #1d1400; background: #ffb020; border-color: #ffb020; }
+.fs-susp { color: #fff; background: #d62828; border-color: #d62828; }
+.fs-ob { color: #00191d; background: #3ec7e0; border-color: #3ec7e0; }
+.fs-ta { color: #071a00; background: #5fd23a; border-color: #5fd23a; }
+.fs-rea { color: #5fd23a; border-color: #5fd23a; }
+table.data.traffic .ctot { color: #ffb020; font-weight: 700; cursor: help; }
+table.data.traffic tr.offline td { opacity: .7; }
+.viff-note { margin: 3px 0 6px; font-size: 11px; }
+
+/* vIFF: ruch vs przepustowość sektora (panel mapy i wykres w lewym dolnym rogu mapy) */
+.swatch.viff { background: rgba(255,212,0,.08); border: 2px solid #ffd400; }
+.viff-tv { width: 100%; margin: 6px 0 4px; }
+.vf-row { display: grid; grid-template-columns: 82px 1fr 52px; gap: 6px; align-items: center; width: 100%; padding: 2px 4px; margin: 2px 0;
+  background: transparent; border: 1px solid transparent; border-radius: 4px; color: var(--text); font: 12px var(--mono); cursor: pointer; text-align: left; }
+.vf-row:hover { border-color: #2c3640; } .vf-row.on { border-color: #ffd400; }
+.vf-bar { height: 8px; background: #1b2229; border-radius: 4px; overflow: hidden; }
+.vf-bar i { display: block; height: 100%; }
+.vf-num { text-align: right; color: var(--muted); }
+.vf-bar i.ok, .vf-legend i.vf-ok { background: #3fb950; } .vf-bar i.near, .vf-legend i.vf-near { background: #ffb020; }
+.vf-bar i.over, .vf-legend i.vf-over { background: #f0453a; } .vf-bar i.nolim { background: #56606a; }
+.viff-chart { width: 560px; background: rgba(9,12,15,.94); border: 1px solid #2c3640; border-radius: 8px; padding: 8px 10px; color: var(--text);
+  box-shadow: 0 6px 20px rgba(0,0,0,.5); font-size: 12px; }
+.vf-head { display: flex; gap: 8px; align-items: baseline; }
+.vf-head b { font: 700 16px var(--mono); color: #ffd400; }
+.vf-head .hint { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vf-close { padding: 0 8px; }
+.vf-svg { width: 100%; height: auto; display: block; margin-top: 4px; }
+.vf-svg rect.vf-ok { fill: #3fb950; } .vf-svg rect.vf-near { fill: #ffb020; } .vf-svg rect.vf-over { fill: #f0453a; } .vf-svg rect.vf-nolim { fill: #4a7bd0; }
+.vf-svg .vf-occ { stroke-width: 1.5; } .vf-svg .vf-occ.vf-ok { fill: rgba(63,185,80,.35); stroke: #3fb950; }
+.vf-svg .vf-occ.vf-near { fill: rgba(255,176,32,.35); stroke: #ffb020; } .vf-svg .vf-occ.vf-over { fill: rgba(240,69,58,.4); stroke: #f0453a; }
+.vf-svg .vf-occ.vf-nolim { fill: rgba(74,123,208,.35); stroke: #4a7bd0; }
+.vf-svg .vf-cap { stroke: #ff5cc8; stroke-width: 1.6; stroke-dasharray: 5 3; }
+.vf-svg .vf-capt { fill: #ff5cc8; font: 700 11px var(--mono); } .vf-svg .vf-capt.mid { text-anchor: middle; font-weight: 400; }
+.vf-svg .vf-grid { stroke: #232c35; }
+.vf-svg text { fill: #aab4bd; font: 11px var(--mono); text-anchor: middle; }
+.vf-svg .vf-ax.end { text-anchor: end; } .vf-svg .vf-val { fill: #fff; font-weight: 700; }
+.vf-svg .vf-sub { fill: #8fa3b5; font: 700 10px Arial, sans-serif; letter-spacing: .5px; text-transform: uppercase; }
+.vf-svg .vf-win { fill: #cfd8e0; font-size: 10px; }
+.vf-legend { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: center; margin: 2px 0 4px; font-size: 11px; }
+.vf-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 4px; vertical-align: -1px; }
+.vf-legend i.vf-capl { height: 0; width: 14px; border-top: 2px dashed #ff5cc8; border-radius: 0; }
+.vf-flights { display: flex; flex-wrap: wrap; gap: 2px 10px; max-height: 54px; overflow: auto; font-size: 11px; color: #dfe8ff; }
+.vf-flights .vf-gnd { color: #8c969e; }
