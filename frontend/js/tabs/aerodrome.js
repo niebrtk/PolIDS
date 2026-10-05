@@ -1,4 +1,5 @@
 import { api, esc, fmt, h } from "../api.js";
+import { colorize } from "./meteo.js";
 
 // Róża wiatrów: pasy jako prostokąty, strzałka wiatru skąd wieje.
 function windrose(status) {
@@ -46,6 +47,10 @@ function value(label, v, extra = "") {
 
 export default {
   mount(root, ctx) {
+    const MAIN = ["EPWA", "EPMO", "EPKK", "EPKT", "EPGD", "EPPO", "EPWR", "EPLL", "EPRZ", "EPLB", "EPSC", "EPBY", "EPSY", "EPZG", "EPRA"];
+    const sub = h(`<nav class="submenu">${MAIN.map((i) => `<button data-ad="${i}">${i}</button>`).join("")}</nav>`);
+    root.append(sub);
+    sub.addEventListener("click", (e) => { const b = e.target.closest("button[data-ad]"); if (b) go(b.dataset.ad); });
     const pane = h(`<div class="pane">
       <div class="toolbar">
         <input class="field ad" list="ad-list" size="10" placeholder="ICAO">
@@ -128,7 +133,7 @@ export default {
           </div>
         </div>
         <div class="grid two" style="margin-top:12px">
-          <div class="card"><h3>METAR</h3><pre>${esc(st.metar || "brak")}</pre><h3 style="margin-top:12px">TAF</h3><pre>${esc(st.taf || "brak")}</pre></div>
+          <div class="card"><h3>METAR</h3><div class="wx">${colorize(st.metar)}</div><h3 style="margin-top:12px">TAF</h3><div class="wx">${st.taf ? st.taf.split("\n").map((l) => colorize(l.trim())).join("<br>&nbsp;&nbsp;&nbsp;&nbsp;") : colorize(null)}</div></div>
           <div class="card"><h3>Częstotliwości</h3>
             <table class="data">${info.atc_positions.map((x) => `<tr><td class="mono">${esc(x.callsign)}</td><td>${esc(x.name)}</td><td class="num">${esc(x.frequency)}</td></tr>`).join("")
               || info.frequencies.map((x) => `<tr><td>${esc(x.kind)}</td><td>${esc(x.description)}</td><td class="num">${esc(x.mhz)}</td></tr>`).join("")
@@ -145,6 +150,7 @@ export default {
       icao = (code || $(".ad").value || icao).trim().toUpperCase();
       $(".ad").value = icao;
       localStorage.setItem("aerodrome.icao", icao);
+      sub.querySelectorAll("button").forEach((b) => b.classList.toggle("active", b.dataset.ad === icao));
       history.replaceState(null, "", "#aerodrome/" + icao);
       load();
       clearInterval(timer);

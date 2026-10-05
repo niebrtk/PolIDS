@@ -1,3 +1,5 @@
+import json
+
 from fastapi import APIRouter, Depends
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -24,6 +26,11 @@ def config():
         "openaip_api_key": settings.openaip_api_key,
         "metar_source": settings.metar_source,
     }
+
+
+@router.get("/emergency")
+def emergency():
+    return json.loads((settings.seed_dir / "emergency.json").read_text("utf-8"))
 
 
 @router.get("/status")

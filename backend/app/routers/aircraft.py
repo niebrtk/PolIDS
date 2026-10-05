@@ -17,12 +17,15 @@ def _dict(a: AircraftType) -> dict:
 
 
 @router.get("")
-def search(q: str = "", wtc: str = "", recat: str = "", limit: int = 200, db: Session = Depends(get_db)):
+def search(q: str = "", prefix: str = "", wtc: str = "", recat: str = "", limit: int = 200,
+           db: Session = Depends(get_db)):
     stmt = select(AircraftType).order_by(AircraftType.icao, AircraftType.model).limit(min(limit, 2000))
     if q:
         like = f"%{q}%"
         stmt = stmt.where(or_(AircraftType.icao.ilike(like), AircraftType.model.ilike(like),
                               AircraftType.manufacturer.ilike(like), AircraftType.iata.ilike(like)))
+    if prefix:
+        stmt = stmt.where(AircraftType.icao.startswith(prefix.upper()))
     if wtc:
         stmt = stmt.where(AircraftType.wtc == wtc.upper())
     if recat:

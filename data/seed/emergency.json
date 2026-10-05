@@ -1,0 +1,35 @@
+{
+  "_uwaga": "Procedury awaryjne wyświetlane w zakładce EMERGENCY. Dodawaj kolejne wpisy w tym samym formacie (sections: tytuł + lista punktów).",
+  "procedures": [
+    {
+      "id": "A06",
+      "title": "A06 Emergency Descent (Zniżanie awaryjne)",
+      "sections": [
+        {"title": "ACC / APP / TWR", "items": [
+          "Zapewnij separację i/lub informacje o ruchu",
+          "Uwzględnij granice przestrzeni / skoordynuj skrót",
+          "Po awaryjnym zniżaniu:",
+          "Potwierdź stan statku powietrznego / intencje załogi (zmiana lotniska docelowego, obrażenia, uszkodzenia statku powietrznego)",
+          "Przyjmij, że a/c jest nadal w niebezpieczeństwie",
+          "Jeśli konieczne, nadaj informację o zniżaniu na częstotliwości ATC i częstotliwości awaryjnej",
+          "Powiadom kierownika zmiany ATM",
+          "Powiadom następny organ / sektor"
+        ]},
+        {"title": "Bądź przygotowany na:", "items": [
+          "Zniżanie bez ostrzeżenia",
+          "Squawk 7700",
+          "Opuszczenie trasy lotu",
+          "Ostrzeżenie o ruchu",
+          "Nieczytelną transmisję"
+        ]},
+        {"title": "Informacje dodatkowe:", "items": [
+          "Czas do rozpoczęcia zniżania to średnio 5 do 15 sekund (początkowa prędkość zniżania wynosi od 7000 ft/min do 14000 ft/min)",
+          "Squawk 7700 pojawia się z opóźnieniem lub wcale",
+          "ATC jest zazwyczaj poinformowane za późno z powodu ograniczonej zdolności załogi do działania; przy zakładaniu masek tlenowych następuje automatyczne przełączenie odbioru ze słuchawek na głośnik w kokpicie, więc mikrofon w kokpicie oraz korespondencja może być zakłócona odgłosami w tle",
+          "Z powodu gwałtownej utraty ciśnienia w kabinie ciśnienie gazów w ludzkim ciele wzrasta, powodując złe samopoczucie załogi",
+          "Czas do utraty przytomności przez załogę (pozbawioną tlenu) to od 4 do 30 sekund w zależności od poziomu lotu (tzw. czas użyteczny przytomności)"
+        ]}
+      ]
+    }
+  ]
+}

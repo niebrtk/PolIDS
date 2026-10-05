@@ -9,8 +9,10 @@ router = APIRouter(prefix="/api/callsigns", tags=["callsign"])
 
 
 @router.get("")
-def search(q: str = "", limit: int = 200, db: Session = Depends(get_db)):
+def search(q: str = "", prefix: str = "", limit: int = 200, db: Session = Depends(get_db)):
     stmt = select(Callsign)
+    if prefix:
+        stmt = stmt.where(Callsign.icao.startswith(prefix.upper()))
     if q:
         like = f"%{q}%"
         stmt = stmt.where(or_(Callsign.icao.ilike(like), Callsign.name.ilike(like),

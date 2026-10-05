@@ -1,6 +1,9 @@
 import { api } from "./api.js";
 import meteo from "./tabs/meteo.js";
-import aip from "./tabs/aip.js";
+import { adciv, admil, advfr } from "./tabs/aip.js";
+import about from "./tabs/about.js";
+import radio from "./tabs/radio.js";
+import emergency from "./tabs/emergency.js";
 import aircraft from "./tabs/aircraft.js";
 import callsign from "./tabs/callsign.js";
 import aerodrome from "./tabs/aerodrome.js";
@@ -8,7 +11,7 @@ import map from "./tabs/map.js";
 import inop from "./tabs/inop.js";
 import docs from "./tabs/docs.js";
 
-const TABS = { meteo, aip, aircraft, callsign, aerodrome, map, inop, docs };
+const TABS = { about, radio, meteo, aerodrome, adciv, admil, advfr, callsign, aircraft, map, inop, docs, emergency };
 const views = document.getElementById("views");
 const mounted = {};
 const ctx = { config: null, open };
@@ -41,7 +44,7 @@ window.addEventListener("hashchange", () => {
 
 function tick() {
   const d = new Date();
-  document.getElementById("utc").textContent = d.toISOString().slice(11, 19) + " UTC";
+  document.getElementById("utc").textContent = d.toISOString().slice(11, 19) + "Z";
 }
 setInterval(tick, 1000);
 tick();
@@ -50,6 +53,7 @@ tick();
   try {
     ctx.config = await api("/api/config");
     document.getElementById("airac").textContent = `AIRAC ${ctx.config.airac.ident}`;
+    document.getElementById("airac").title = `od ${ctx.config.airac.effective}, następny ${ctx.config.airac.next}`;
   } catch (e) {
     ctx.config = { links: {}, default_aerodrome: "EPWA", airac: {} };
     console.error(e);

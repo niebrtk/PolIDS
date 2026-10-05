@@ -1,14 +1,15 @@
-import { iframeWithFallback, subtabs } from "../api.js";
+import { h, iframeWithFallback } from "../api.js";
 
 const NOTE = "Jeśli strona się nie wyświetla, blokuje osadzanie – użyj przycisku obok.";
 
-export default {
+const frame = (key) => ({
   mount(root, ctx) {
-    const l = ctx.config.links;
-    subtabs(root, [
-      { id: "civ", label: "AD CIV (IFR)", fill: true, render: (p) => iframeWithFallback(p, l.aip_ifr, NOTE) },
-      { id: "vfr", label: "AD VFR", fill: true, render: (p) => iframeWithFallback(p, l.aip_vfr, NOTE) },
-      { id: "mil", label: "AD MIL", fill: true, render: (p) => iframeWithFallback(p, l.aip_mil, NOTE) },
-    ]);
+    const pane = h(`<div class="pane fill"></div>`);
+    root.append(pane);
+    iframeWithFallback(pane, ctx.config.links[key], NOTE);
   },
-};
+});
+
+export const adciv = frame("aip_ifr");
+export const admil = frame("aip_mil");
+export const advfr = frame("aip_vfr");

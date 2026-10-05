@@ -3,16 +3,21 @@
 Aplikacja webowa dla kontrolerów VATSIM PL vACC wzorowana na systemie PANDORA (PAŻP).
 Backend w Pythonie (FastAPI + SQLite), frontend w czystym HTML/JS, który rozmawia wyłącznie z API.
 
-| Zakładka | Co jest | Skąd dane |
+Wygląd wzorowany na PANDORZE: czarne tło, kolumna zielonych przycisków menu i druga kolumna podmenu.
+
+| Menu | Co jest | Skąd dane |
 |---|---|---|
-| **METEO** | METAR / TAF dla listy lotnisk, mapa QNH regionalnych, Windy | metar.vatsim.net / aviationweather.gov |
-| **AIP** | AD CIV (IFR), AD VFR, AD MIL | eAIP PAŻP (iframe + przycisk „otwórz w nowej karcie”) |
-| **AIRCRAFT** | baza typów: WTC, RECAT-EU, rozpiętość, długość, wysokość, MTOW, podgląd zdjęcia | aircraft-database.com (w repo) + Twój `ICAO_Aircraft.json` |
-| **CALLSIGN** | baza callsignów linii | próbka w repo + `ICAO_Airlines.txt` z pakietu sektorowego |
+| **?** | wersja, AIRAC, stan bazy, ostatnie zmiany | API |
+| **RADIO** | częstotliwości stanowisk EPWW, lotnisk i sąsiadów, kto jest online | `.ese` + VATSIM |
+| **METEO** | METAR PL / MIL / INTL, TAF PL / INTL (kolorowane), QNH regionalne, Windy, radar, satelita | metar.vatsim.net / aviationweather.gov |
 | **AERODROME** | AWOS: róża wiatrów, QNH/QFE, widzialność, chmury, RVR, składowe wiatru, **pas sugerowany**, METAR/TAF, NOTAM, częstotliwości, checklista | METAR/TAF jw., NOTAM z cv.plvacc.pl, pasy z OurAirports, stanowiska z `.ese` |
-| **MAP** | Leaflet: sektory EPWW z częstotliwościami na wybranym FL, **aktualna sektoryzacja z VATSIM**, trasa z planu lotu rozwijana po drogach lotniczych, VOR/NDB/FIX, drogi lotnicze, opcjonalnie OpenAIP | pliki `.sct`, `.ese`, `airway.txt`, `isec.txt` |
+| **AD CIV / AD MIL / AD VFR** | eAIP PAŻP | iframe + „otwórz w nowej karcie” |
+| **CALLSIGN** | baza callsignów, podmenu A–Z | `ICAO_Airlines.txt` |
+| **AIRCRAFT** | typy: WTC, RECAT-EU, wymiary, MTOW, zdjęcie, podmenu A–Z | aircraft-database.com + `ICAO_Aircraft.json` |
+| **MAP** | sektory EPWW na wybranym FL, aktualna sektoryzacja z VATSIM, trasa z planu lotu po drogach lotniczych, VOR/NDB/FIX | `.sct`, `.ese`, `airway.txt`, `isec.txt` |
 | **INOP** | om.plvacc.pl | iframe |
-| **DOCS** | PDF-y z bazy otwierane w aplikacji, upload | folder `data/docs/` |
+| **DOCS** | PDF-y otwierane w aplikacji, upload | `data/docs/` |
+| **EMERGENCY** | procedury awaryjne (czerwona ramka) | `data/seed/emergency.json` |
 
 Dokumentacja API (Swagger) po uruchomieniu: <http://127.0.0.1:8000/docs>
 

@@ -62,6 +62,13 @@ def _positions(db: Session) -> dict[str, AtcPosition]:
     return {p.position_id: p for p in db.scalars(select(AtcPosition))}
 
 
+@router.get("/positions")
+def positions(db: Session = Depends(get_db)):
+    """Stanowiska ATC z pliku .ese (zakładka RADIO)."""
+    return [{"callsign": p.callsign, "name": p.name, "frequency": p.frequency, "position_id": p.position_id,
+             "prefix": p.prefix} for p in db.scalars(select(AtcPosition).order_by(AtcPosition.callsign))]
+
+
 @router.get("/sectors")
 def sectors(fir: str = "EPWW", level_ft: int | None = None, db: Session = Depends(get_db)):
     """Sektory z pliku .ese jako GeoJSON. Bez zaimportowanego .ese zwraca plik data/seed/sectors.geojson."""

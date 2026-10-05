@@ -1,4 +1,4 @@
-import { api, debounce, esc, fmt, h } from "../api.js";
+import { api, debounce, esc, fmt, h, letterMenu } from "../api.js";
 
 const RECAT = {
   A: "Super Heavy", B: "Upper Heavy", C: "Lower Heavy", D: "Upper Medium", E: "Lower Medium", F: "Light",
@@ -17,6 +17,8 @@ function photoUrl(a) {
 
 export default {
   mount(root) {
+    let prefix = "";
+    const letters = letterMenu(root, (l) => { prefix = l; load(); });
     const pane = h(`<div class="pane"><div class="split">
       <div class="list">
         <div class="toolbar">
@@ -35,12 +37,17 @@ export default {
     root.append(pane);
     const $ = (s) => pane.querySelector(s);
     let rows = [];
+    let seq = 0;
 
     const load = async () => {
-      const qs = new URLSearchParams({ q: $(".q").value.trim(), wtc: $(".wtc").value, recat: $(".recat").value, limit: 500 });
+      const qs = new URLSearchParams({ q: $(".q").value.trim(), prefix, wtc: $(".wtc").value, recat: $(".recat").value, limit: 500 });
+      const my = ++seq;
+      let data;
       try {
-        rows = await api(`/api/aircraft?${qs}`);
+        data = await api(`/api/aircraft?${qs}`);
       } catch (e) { $("tbody").innerHTML = `<tr><td colspan="10" class="error">${esc(e.message)}</td></tr>`; return; }
+      if (my !== seq) return; // starsza odpowiedź przyszła po nowszej
+      rows = data;
       $(".count").textContent = `${rows.length} typów${rows.length === 500 ? " (pokazano pierwsze 500)" : ""}`;
       $("tbody").innerHTML = rows.map((a, i) => `<tr data-i="${i}">
         <td class="mono"><b>${esc(a.icao)}</b></td><td>${esc(a.manufacturer)}</td><td>${esc(a.model)}</td>
@@ -88,6 +95,6 @@ export default {
     $(".wtc").addEventListener("change", load);
     $(".recat").addEventListener("change", load);
     load();
-    return { activate: (arg) => { if (arg) { $(".q").value = arg; load(); } $(".q").focus(); } };
+    return { activate: (arg) => { if (arg) { $(".q").value = arg; prefix = ""; letters.set(""); load(); } $(".q").focus(); } };
   },
 };

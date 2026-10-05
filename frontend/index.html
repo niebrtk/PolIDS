@@ -8,23 +8,27 @@
   <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
-  <header class="topbar">
-    <div class="brand">vPANDORA</div>
-    <nav id="tabs" class="tabs">
+  <aside class="menu">
+    <nav id="tabs">
+      <button data-tab="about">?</button>
+      <button data-tab="radio">RADIO</button>
       <button data-tab="meteo">METEO</button>
-      <button data-tab="aip">AIP</button>
-      <button data-tab="aircraft">AIRCRAFT</button>
-      <button data-tab="callsign">CALLSIGN</button>
       <button data-tab="aerodrome">AERODROME</button>
+      <button data-tab="adciv">AD CIV</button>
+      <button data-tab="admil">AD MIL</button>
+      <button data-tab="advfr">AD VFR</button>
+      <button data-tab="callsign">CALLSIGN</button>
+      <button data-tab="aircraft">AIRCRAFT</button>
       <button data-tab="map">MAP</button>
       <button data-tab="inop">INOP</button>
       <button data-tab="docs">DOCS</button>
+      <button data-tab="emergency" class="red">EMERGENCY</button>
     </nav>
-    <div class="status">
-      <span id="airac" title="Aktualny cykl AIRAC"></span>
-      <span id="utc" class="clock"></span>
+    <div class="clockbox">
+      <div id="utc" class="clock"></div>
+      <div id="airac" class="hint"></div>
     </div>
-  </header>
+  </aside>
   <main id="views"></main>
   <script src="/static/vendor/leaflet/leaflet.js"></script>
   <script type="module" src="/static/js/app.js"></script>

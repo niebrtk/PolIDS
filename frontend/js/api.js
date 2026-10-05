@@ -33,23 +33,40 @@ export function debounce(fn, ms = 250) {
   return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); };
 }
 
-// Pod-zakładki wewnątrz widoku: [{id, label, render(pane)}]
-export function subtabs(root, tabs, extraHtml = "") {
-  const bar = h(`<div class="subtabs">${tabs.map((t) => `<button data-id="${t.id}">${esc(t.label)}</button>`).join("")}<span class="spacer"></span>${extraHtml}</div>`);
+// Podmenu PANDORY: kolumna zielonych przycisków obok menu głównego.
+// tabs: [{id, label, render(pane), fill?}] albo {sep: true} jako odstęp.
+export function subtabs(root, tabs) {
+  const nav = h(`<nav class="submenu">${tabs.map((t) => t.sep ? `<div class="sep"></div>` : `<button data-id="${t.id}">${esc(t.label)}</button>`).join("")}</nav>`);
   const pane = h(`<div class="pane"></div>`);
-  root.append(bar, pane);
+  root.append(nav, pane);
   let current = null;
   const show = (id) => {
     current?.destroy?.();
-    bar.querySelectorAll("button[data-id]").forEach((b) => b.classList.toggle("active", b.dataset.id === id));
-    const t = tabs.find((x) => x.id === id);
+    const t = tabs.find((x) => x.id === id) || tabs.find((x) => !x.sep);
+    nav.querySelectorAll("button[data-id]").forEach((b) => b.classList.toggle("active", b.dataset.id === t.id));
     pane.className = "pane" + (t.fill ? " fill" : "");
     pane.innerHTML = "";
     current = t.render(pane) || null;
   };
-  bar.addEventListener("click", (e) => { const b = e.target.closest("button[data-id]"); if (b) show(b.dataset.id); });
-  show(tabs[0].id);
-  return { bar, pane, show };
+  nav.addEventListener("click", (e) => { const b = e.target.closest("button[data-id]"); if (b) show(b.dataset.id); });
+  show(tabs.find((x) => !x.sep).id);
+  return { nav, pane, show };
+}
+
+// Podmenu z literami A–Z (jak w AIRCRAFT / CALLSIGN w PANDORZE). onPick("") = wszystkie.
+export function letterMenu(root, onPick) {
+  const letters = ["*", ..."ABCDEFGHIJKLMNOPQRSTUVWXYZ"];
+  const nav = h(`<nav class="submenu letters">${letters.map((l) => `<button data-l="${l}">${l === "*" ? "∗" : l}</button>`).join("")}</nav>`);
+  root.append(nav);
+  const set = (l) => nav.querySelectorAll("button").forEach((b) => b.classList.toggle("active", b.dataset.l === l));
+  nav.addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-l]");
+    if (!b) return;
+    set(b.dataset.l);
+    onPick(b.dataset.l === "*" ? "" : b.dataset.l);
+  });
+  set("*");
+  return { set: (l) => set(l || "*") };
 }
 
 export function iframeWithFallback(pane, url, note = "") {
@@ -61,7 +78,7 @@ export function iframeWithFallback(pane, url, note = "") {
 }
 
 export const BASEMAPS = {
-  dark: L => L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+  dark: L => L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png", {
     attribution: "© OpenStreetMap, © CARTO", subdomains: "abcd", maxZoom: 19 }),
   osm: L => L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
     attribution: "© OpenStreetMap", maxZoom: 19 }),
