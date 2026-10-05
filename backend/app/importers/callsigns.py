@@ -23,7 +23,11 @@ def parse_icao_airlines(text: str) -> list[dict]:
 
 
 def import_icao_airlines(db: Session, path: Path) -> int:
-    rows = parse_icao_airlines(read_text(path))
+    text = read_text(path)
+    rows = parse_icao_airlines(text)
+    if not rows and len(text.strip().splitlines()) == 1:
+        # w pakiecie sektorowym ICAO_Airlines.txt bywa tylko odnośnikiem do ../../ICAO/ICAO_Airlines.txt
+        raise ValueError(f"Plik zawiera tylko ścieżkę '{text.strip()}'. Skopiuj prawdziwy plik z folderu ICAO pakietu.")
     for r in rows:
         db.merge(Callsign(source="sector-file", **r))
     db.commit()
