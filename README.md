@@ -2,14 +2,16 @@
 
 Aplikacja webowa dla kontrolerów VATSIM PL vACC wzorowana na systemie PANDORA (PAŻP).
 Backend w Pythonie (FastAPI + SQLite), frontend w czystym HTML/JS, który rozmawia wyłącznie z API.
+Aplikacja działa lokalnie na komputerze kontrolera pod adresem <http://127.0.0.1:8000>. Nie da się jej wystawić na
+GitHub Pages, bo Pages serwuje tylko pliki statyczne i nie uruchomi backendu w Pythonie.
 
 Wygląd wzorowany na PANDORZE: czarne tło, kolumna zielonych przycisków menu i druga kolumna podmenu.
 
 | Menu | Co jest | Skąd dane |
 |---|---|---|
 | **?** | wersja, AIRAC, stan bazy, ostatnie zmiany | API |
-| **RADIO** | częstotliwości stanowisk EPWW, lotnisk i sąsiadów, kto jest online | `.ese` + VATSIM |
-| **METEO** | METAR PL / MIL / INTL, TAF PL / INTL (kolorowane), QNH regionalne, Windy, radar, satelita | metar.vatsim.net / aviationweather.gov |
+| **RADIO** | częstotliwości stanowisk EPWW, lotnisk i sąsiadów, kto jest online | `.ese` + [VATSIM data feed](https://vatsim.dev/services/apis) |
+| **METEO** | METAR PL / MIL / INTL, TAF PL / INTL (kolorowane), QNH regionalne, Windy (wiatr, radar, satelita), IMGW AWIACJA | metar.vatsim.net / aviationweather.gov, awiacja.imgw.pl |
 | **AERODROME** | AWOS: róża wiatrów, QNH/QFE, widzialność, chmury, RVR, składowe wiatru, **pas sugerowany**, METAR/TAF, NOTAM, częstotliwości, checklista | METAR/TAF jw., NOTAM z cv.plvacc.pl, pasy z OurAirports, stanowiska z `.ese` |
 | **AD CIV / AD MIL / AD VFR** | eAIP PAŻP | iframe + „otwórz w nowej karcie” |
 | **CALLSIGN** | baza callsignów, podmenu A–Z | `ICAO_Airlines.txt` |
@@ -24,7 +26,8 @@ Dokumentacja API (Swagger) po uruchomieniu: <http://127.0.0.1:8000/docs>
 ## Uruchomienie na Windows
 
 1. Zainstaluj **Python 3.11 lub nowszy** z <https://www.python.org/downloads/> (zaznacz „Add python.exe to PATH”).
-2. Pobierz kod (zielony przycisk *Code → Download ZIP* na GitHubie albo `git clone`) i przełącz się na tę gałąź.
+2. Pobierz kod z gałęzi `claude/vpandora-local-mvp-ovbih3`: na GitHubie wybierz tę gałąź i kliknij *Code → Download ZIP*
+   albo `git clone -b claude/vpandora-local-mvp-ovbih3 https://github.com/niebrtk/vpandora.git`.
 3. Pliki sektorowe EPWW i navdata są już w `data\import\`. Przy nowej sektorówce podmień je tam (lista w [data/import/README.md](data/import/README.md)).
 4. Kliknij dwukrotnie **`run.bat`**. Za pierwszym razem utworzy środowisko `.venv`, zainstaluje biblioteki,
    zbuduje bazę `data\vpandora.db` (import navdata trwa kilkanaście sekund) i otworzy <http://127.0.0.1:8000>.
@@ -39,6 +42,20 @@ python -m uvicorn backend.app.main:app --reload --reload-dir backend
 ```
 
 Linux/macOS: `./run.sh`.
+
+### Aktualizacja aplikacji
+
+Przy `git clone`: `git pull`, potem znowu `run.bat` (nowe biblioteki doinstalują się same). Przy ZIP-ie pobierz go
+ponownie i rozpakuj w miejsce starego folderu. Jeśli po aktualizacji coś wygląda staro, usuń `data\vpandora.db`
+(baza zbuduje się od nowa z plików w repo) i odśwież stronę przez Ctrl+F5.
+
+### Gdy coś nie działa
+
+- **„Unable to connect” / „Nie można połączyć”**: serwer jeszcze startuje albo okno `run.bat` zostało zamknięte.
+  `run.bat` otwiera przeglądarkę dopiero, gdy serwer odpowiada; okno konsoli musi zostać otwarte.
+- **Port 8000 zajęty**: zamknij poprzednie okno `run.bat` albo inny program na tym porcie.
+- **Brak METAR / NOTAM / online**: te dane pobierane są na żywo z internetu (metar.vatsim.net, cv.plvacc.pl, VATSIM),
+  więc wymagają połączenia. Błąd źródła widać w odpowiedniej zakładce; ostatnie pobrane dane są używane z pamięci podręcznej.
 
 ### Ustawienia
 
