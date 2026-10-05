@@ -1,6 +1,5 @@
 import { BASEMAPS, LIGHT_BASEMAPS, api, atcPositions, esc, h, hhmm, vatsimAtc, vatsimOnline } from "../api.js";
 import { FACILITIES, PLANE_PATH, SymbolMarker, aircraftMarker, airportBadge, atcPanes, drawFirs, drawSectors, fl, loadFirs, sectorOwners, symbolFor, symbolSvg } from "../airspace.js";
-import { colorize } from "./meteo.js";
 
 // Kolory zależne od podkładu (ciemny / jasny)
 const THEME = {
@@ -157,10 +156,10 @@ export default {
       const ctrls = FACILITIES.filter(([k]) => k !== "ATIS" && fac[k]).flatMap(([k, l]) => fac[k].map((c) => ({ ...c, k, l })));
       const atis = fac.ATIS || [];
       return `<div class="adc-h"><b>${esc(icao)}</b><span>${esc(name || "")}</span></div>
-        <div class="adc-sec">METAR</div><div class="adc-metar wx">${metar === undefined ? '<span class="hint">ładowanie…</span>' : metar ? colorize(metar) : '<span class="hint">brak</span>'}</div>
+        <div class="adc-sec">METAR</div><div class="adc-metar">${metar === undefined ? '<span class="muted">ładowanie…</span>' : metar ? esc(metar) : '<span class="muted">brak</span>'}</div>
         <div class="adc-sec">Kontrola</div>${ctrls.length ? `<table>${ctrls.map((c) => `<tr><td><span class="ab ab-${c.k.toLowerCase()}">${c.l}</span></td>
           <td class="cs">${esc(c.callsign)}</td><td class="fq">${esc(c.frequency)}</td><td>${esc(c.name || "")}</td><td class="muted">od ${hhmm(c.logon_time)}</td></tr>`).join("")}</table>`
-          : '<div class="hint">nikt nie jest zalogowany (UNICOM 122.800)</div>'}
+          : '<div class="muted">nikt nie jest zalogowany (UNICOM 122.800)</div>'}
         ${atis.map((a) => `<div class="adc-sec">ATIS ${esc(a.atis_code || "")} <span class="muted">${esc(a.callsign)} ${esc(a.frequency)}</span></div>
           <div class="adc-atis">${(a.text_atis || []).map(esc).join(" ")}</div>`).join("")}`;
     };

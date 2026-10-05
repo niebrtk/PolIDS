@@ -443,13 +443,18 @@ table.callsigns td.minor { font-size: 12px; color: var(--muted); }
 .lg-atc > span { display: inline-flex; align-items: center; gap: 5px; }
 .sw .ab { font-size: 10px; }
 
-/* MAP: dymek lotniska (jak karta lotniska w NM UI): ICAO, nazwa, METAR, kontrola, ATIS */
-.leaflet-tooltip.ad-tip { min-width: 320px; max-width: 520px; padding: 8px 10px; }
-.ad-tip .adc-h { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; border-bottom: 1px solid #2a333c; padding-bottom: 4px; margin-bottom: 4px; }
-.ad-tip .adc-h b { font: 700 20px var(--mono); color: #7fc6e8; }
-.ad-tip .adc-h span { font: 700 14px Arial, sans-serif; color: #fff; }
-.ad-tip .adc-sec { margin: 6px 0 2px; font: 700 11px Arial, sans-serif; text-transform: uppercase; letter-spacing: 1px; color: #c8d3dc; }
-.ad-tip .adc-metar { white-space: normal; font: 12px/1.4 var(--mono); }
-.ad-tip .adc-atis { white-space: normal; color: #f3df9a; font: 12px/1.4 var(--mono); }
-.ad-tip table td { padding: 1px 5px 1px 0; }
-.ext-card .mono { word-break: break-all; }
+/* MAP: dymek lotniska jak karta lotniska w atciss: biała karta, ICAO jasnoniebieskie, nazwa po prawej,
+   METAR czcionką o stałej szerokości, pod spodem kontrola online i ATIS */
+.leaflet-tooltip.ad-tip { min-width: 320px; max-width: 520px; padding: 10px 12px; background: #fff; color: #1d2329;
+  border: 1px solid #d5dbe1; border-radius: 6px; box-shadow: 0 6px 20px rgba(0,0,0,.45); }
+.leaflet-tooltip.ad-tip::before { border-top-color: #fff; }
+.ad-tip .adc-h { display: flex; justify-content: space-between; align-items: baseline; gap: 18px; margin-bottom: 6px; }
+.ad-tip .adc-h b { font: 700 22px Arial, sans-serif; color: #7ab8d9; }
+.ad-tip .adc-h span { font: 700 15px Arial, sans-serif; color: #1d2329; }
+.ad-tip .adc-sec { margin: 8px 0 3px; font: 700 12px Arial, sans-serif; text-transform: uppercase; letter-spacing: .5px; color: #1d2329; }
+.ad-tip .adc-metar { white-space: normal; font: 13px/1.45 var(--mono); color: #1d2329; }
+.ad-tip .adc-atis { white-space: normal; font: 12px/1.45 var(--mono); color: #3d4650; }
+.ad-tip table td { padding: 1px 6px 1px 0; color: #1d2329; }
+.ad-tip td.cs { color: #0b3d91; font-weight: 700; }
+.ad-tip td.fq { color: #1a7f2e; font-weight: 700; }
+.ad-tip .muted { color: #6b7680; }
