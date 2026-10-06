@@ -1,6 +1,9 @@
 import { api, esc, h } from "../api.js";
 
 const CHANGES = [
+  ["06.10.2026", "MAP › SEKTORYZACJA: trzy mapy LOW / MID / HIGH z dziedziczeniem sektorów EPWW przez konkretne stanowiska (łańcuchy z vacs-data), tryb VATSIM teraz i symulacja, tabela kto co obsługuje, różnice względem pliku .ese. Sektoryzacja na głównej mapie i w RADIO liczona tak samo."],
+  ["06.10.2026", "RADIO: stanowiska w FIR-ach sąsiednich nazwane jak w profilu VACS ACC_EPWW, z dopiskiem wysokości (np. ESMM 6 +365) i podpowiedzią, kto przejmuje sektor, gdy główne stanowisko jest offline."],
+  ["06.10.2026", "AERODROME › RUCH: loty jako paski postępu lotu w stylu EFES (odloty niebieskie, przyloty żółte, loty lokalne różowe), SID/STAR z pliku .ese, czasy vIFF/CDM. PRZEGLĄD bez tabeli lotów."],
   ["06.10.2026", "Nowy wygląd w stylu EUROCONTROL NM UI (panele z paskiem tytułu, gęste tabele, płaskie przyciski), zakładki i kolory bez zmian. Bez poświaty w napisach. Po uruchomieniu zawsze strona startowa „?”."],
   ["06.10.2026", "AERODROME: widok AWOS (wiatr DEP/ARR lub TDZ/MID/END, QNH/QFE, LVP, ATIS), godziny wschodu i zachodu słońca, wyśrodkowane tabele."],
   ["06.10.2026", "METEO: mapa QNH regionalnego jak w vAWOS (sektory, TMA, ramki z QNH)."],
@@ -53,7 +56,7 @@ export default {
       const st = await api("/api/status").catch(() => ({ counts: {} }));
       const c = st.counts;
       const row = (k, v) => `<dt>${k}</dt><dd>${v}</dd>`;
-      pane.querySelector(".info").innerHTML = row("Wersja", "0.7.0")
+      pane.querySelector(".info").innerHTML = row("Wersja", "0.8.0")
         + row("Cykl AIRAC", `${esc(ctx.config.airac.ident)} (od ${esc(ctx.config.airac.effective)})`)
         + row("Dane", `${c.aerodromes ?? "–"} lotnisk, ${c.aircraft_types ?? "–"} typów samolotów, ${c.callsigns ?? "–"} callsignów`)
         + row("Nawigacja", `${c.nav_points ?? "–"} punktów, ${c.airway_segments ?? "–"} odcinków dróg, ${c.sectors ?? "–"} sektorów, ${c.atc_positions ?? "–"} stanowisk ATC`)

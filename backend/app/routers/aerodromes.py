@@ -1,4 +1,6 @@
+import asyncio
 import json
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import or_, select
@@ -6,12 +8,14 @@ from sqlalchemy.orm import Session
 
 from ..config import settings
 from ..database import get_db
-from ..models import Aerodrome, AtcPosition
+from ..models import Aerodrome, AircraftType, AtcPosition
+from ..services import viff as viff_service
 from ..services.http_cache import UpstreamError
 from ..services.lvp import evaluate as evaluate_lvp
 from ..services.metar import parse_metar, qfe_from_qnh
+from ..services.procedures import procedures, strip_board
 from ..services.runways import equipment_for, runway_config, runway_heading, select_runways, wind_components
-from ..services.vatsim import controller_info, get_feed, parse_atis
+from ..services.vatsim import airport_traffic, controller_info, get_feed, parse_atis
 from ..services.weather import get_metars, get_tafs
 from ..services.sun import sun_times
 
@@ -118,6 +122,46 @@ async def status(icao: str, db: Session = Depends(get_db)):
         # zgodność wstecz
         "suggested_runway": pref["arr"], "suggestion_reason": pref["reason"],
         "errors": errors,
+    }
+
+
+@router.get("/{icao}/strips")
+async def strips(icao: str, db: Session = Depends(get_db)):
+    """Paski postępu lotu do AERODROME › RUCH (jak EFES): ruch VATSIM, pas w użyciu i litera ATIS (jak /status),
+    vIFF (EOBT, TSAT, CTOT, stan lotu), SID/STAR z pliku .ese i kategoria turbulencji z bazy typów."""
+    ad = _ad(db, icao)
+
+    async def from_viff():
+        try:
+            return await viff_service.departures(ad.icao), None
+        except (UpstreamError, ValueError) as exc:
+            return None, f"vIFF: {exc}"
+
+    st, (viff, viff_error) = await asyncio.gather(status(ad.icao, db), from_viff())
+    traffic, updated, net_error = {}, None, st["network_error"]
+    if not net_error:
+        try:
+            feed = await get_feed()
+            traffic = airport_traffic(feed, ad.icao, ad.lat, ad.lon)
+            updated = feed.get("general", {}).get("update_timestamp")
+        except (UpstreamError, ValueError) as exc:
+            net_error = f"VATSIM: {exc}"
+    types = {p.get("aircraft") for lst in traffic.values() for p in lst if p.get("aircraft")}
+    wtc: dict[str, str] = {}
+    if types:
+        for t, w in db.execute(select(AircraftType.icao, AircraftType.wtc)
+                               .where(AircraftType.icao.in_(types), AircraftType.wtc.is_not(None))):
+            wtc.setdefault(t, w)
+    use, atis = st["runway_in_use"], st["atis"]
+    now = datetime.now(timezone.utc)
+    board = strip_board(ad.icao, traffic, viff, use, wtc, now)
+    procs = procedures().get(ad.icao, {})
+    return {
+        "icao": ad.icao, "name": ad.name, "elevation_ft": ad.elevation_ft, "now": now.strftime("%H%M"),
+        "runway_in_use": use, "atis": {"letter": atis["letter"], "callsign": atis["callsign"]} if atis else None,
+        "cdm": bool(viff and viff.get("cdm")), "states": (viff or {}).get("states") or viff_service.FLIGHT_STATES,
+        "procedures": {"sid": sorted(procs.get("sid", {})), "star": sorted(procs.get("star", {}))},
+        "network_error": net_error, "viff_error": viff_error, "updated": updated, **board,
     }
 
 

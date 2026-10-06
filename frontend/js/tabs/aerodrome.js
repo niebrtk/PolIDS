@@ -1,6 +1,7 @@
 import { api, esc, fmt, h, hhmm, positionTip, vatsimBookings, vatsimOnline, lsGet, lsSet } from "../api.js";
 import { colorize, wxLines } from "./meteo.js";
 import { mountAwos } from "../awos.js";
+import { mountStrips } from "../strips.js";
 
 const TYPE_ORDER = ["CTR", "FSS", "APP", "DEP", "TWR", "GND", "DEL", "ATIS"];
 const byType = (a, b) => TYPE_ORDER.indexOf(a.callsign.split("_").pop()) - TYPE_ORDER.indexOf(b.callsign.split("_").pop()) || a.callsign.localeCompare(b.callsign);
@@ -169,52 +170,15 @@ const NOTAM_SORT = {
   end: (a, b) => (a.perm - b.perm) || (a.end || "9").localeCompare(b.end || "9"),
 };
 
-// Ruch z sieci VATSIM: przyloty, odloty, plany złożone przed połączeniem.
-// Odloty uzupełnia vIFF (jak lista lotów NM UI): EOBT, CTOT i status lotu, a na lotnisku z A-CDM (EPWA)
-// także TOBT, TSAT, AOBT i TTOT.
-const STATE_CLASS = { FI: "fi", SI: "si", SU: "su", AA: "aa", TA: "ta" };
-// kolory opóźnienia jak w liście lotów NM: < 15 min niebieski, < 30 żółty, < 45 pomarańczowy, ≥ 45 czerwony
-const delayClass = (d) => (d === null || d === undefined || d < 1 ? "" : d < 15 ? "d15" : d < 30 ? "d30" : d < 45 ? "d45" : "d60");
-const t4 = (v) => (v ? esc(v) : "–");
-function viffState(v, states) {
-  if (!v) return `<span class="hint">–</span>`;
-  const label = v.state === "SU" && v.suspension ? "SU " + v.suspension.replace(/^FLS-?/, "") : v.state;
-  const tip = [states?.[v.state] || v.state, v.atot && `ATOT ${v.atot}`, v.atfcm_status && `vIFF: ${v.atfcm_status}`, v.cdm_status && v.cdm_status !== v.atfcm_status && `CDM: ${v.cdm_status}`,
-    v.regulation && `regulacja ${v.regulation}`, v.dep_info && `pas/SID ${v.dep_info}`].filter(Boolean).join(" · ");
-  return `<span class="fs fs-${STATE_CLASS[v.state] || "fi"}" title="${esc(tip)}">${esc(label)}</span>${v.ready ? ` <span class="fs fs-rea" title="REA: gotowy do odlotu przed slotem">REA</span>` : ""}`;
-}
-function trafficHtml(t, icao, viff) {
-  const fl = (a) => (a === null || a === undefined ? "–" : a >= 6000 ? "FL" + String(Math.round(a / 100)).padStart(3, "0") : a + " ft");
-  const cs = (p) => `<a href="#map/${encodeURIComponent(p.callsign)}" class="cs">${esc(p.callsign)}</a>`;
-  const arr = t.arrivals.map((p) => `<tr><td>${cs(p)}</td><td>${esc(p.aircraft || "–")}</td><td>${esc(p.departure || "?")}</td>
-    <td class="num">${p.state === "ground" ? "na ziemi" : fl(p.altitude)}</td><td class="num">${p.groundspeed ?? "–"}</td>
-    <td class="num">${p.dist_nm ?? "–"}</td><td class="num">${p.eta_min !== null && p.eta_min !== undefined ? p.eta_min + " min" : "–"}</td></tr>`).join("");
-  // odloty: lista VATSIM + loty, które zna tylko vIFF (np. złożony plan, pilot jeszcze nie połączony)
-  const vmap = Object.fromEntries((viff?.flights || []).map((f) => [f.callsign, f]));
-  const prefiles = Object.fromEntries(t.prefiles.map((p) => [p.callsign, p]));
-  const depRows = t.departures.map((p) => ({ p, v: vmap[p.callsign] }));
-  const known = new Set(t.departures.map((p) => p.callsign));
-  (viff?.flights || []).filter((f) => !known.has(f.callsign))
-    .forEach((f) => depRows.push({ p: { callsign: f.callsign, aircraft: prefiles[f.callsign]?.aircraft, arrival: f.arrival, dist_nm: null, offline: true }, v: f }));
-  const order = (r) => (r.v?.atot || (r.p.state === "air" && !r.v) ? "2" : "1") + (r.v?.tsat || r.v?.tobt || r.v?.eobt || "9999");
-  depRows.sort((a, b) => order(a).localeCompare(order(b)));
-  const cdm = viff?.cdm;
-  const ctot = (v) => (v?.ctot ? `<span class="ctot ${delayClass(v.delay)}" title="${esc([v.delay !== null && v.delay !== undefined && `opóźnienie ${v.delay} min`,
-    v.regulation && "regulacja " + v.regulation, v.airspace && "przestrzeń " + v.airspace].filter(Boolean).join(" · ") || "CTOT")}">${esc(v.ctot)}</span>` : "–");
-  // A/TTOT jak w NM: ATOT, gdy samolot wystartował, inaczej TTOT z CDM
-  const attot = (v) => (v?.atot ? `<span class="atot" title="ATOT (start)">${esc(v.atot)}</span>` : t4(v?.ttot));
-  const dep = depRows.map(({ p, v }) => `<tr class="${p.offline ? "offline" : ""}"><td>${p.offline ? esc(p.callsign) : cs(p)}</td><td>${esc(p.aircraft || "–")}</td><td>${esc(p.arrival || "?")}</td>
-    <td class="num">${t4(v?.eobt)}</td>${cdm ? `<td class="num">${t4(v?.tobt)}</td><td class="num">${t4(v?.tsat)}</td><td class="num">${t4(v?.aobt)}</td><td class="num">${attot(v)}</td>` : ""}
-    <td class="num">${ctot(v)}</td><td>${viffState(v, viff?.states)}</td><td class="num">${p.offline ? "offline" : p.dist_nm ?? "–"}</td></tr>`).join("");
-  const pre = t.prefiles.map((p) => `${esc(p.callsign)} ${esc(p.aircraft || "")} ${esc(p.departure || "")}→${esc(p.arrival || "")}${p.deptime ? " " + esc(p.deptime) + "Z" : ""}`).join(" · ");
-  const table = (title, n, head, rows) => `<h4>${title} <span class="hint">(${n})</span></h4>${n
-    ? `<table class="data traffic"><thead><tr>${head.map((x) => `<th>${x}</th>`).join("")}</tr></thead><tbody>${rows}</tbody></table>` : `<div class="hint">brak</div>`}`;
-  const depHead = ["Callsign", "Typ", "Do", "EOBT", ...(cdm ? ["TOBT", "TSAT", "AOBT", "A/TTOT"] : []), "CTOT", "Status", "NM"];
-  const viffNote = viff?.error ? `<div class="hint viff-note">vIFF niedostępny (${esc(viff.error)}): EOBT, CTOT i status pojawią się, gdy wróci.</div>`
-    : `<div class="hint viff-note">EOBT/CTOT/status z vIFF${cdm ? " · A-CDM: TOBT, TSAT, AOBT, TTOT" : ""} · status jak w NM: FI złożony · SI slot (CTOT) · SU zawieszony · AA aktywowany przez ATC (AOBT) · TA w powietrzu · REA gotowy wcześniej · kolor CTOT = opóźnienie</div>`;
-  return table(`Przyloty do ${esc(icao)}`, t.arrivals.length, ["Callsign", "Typ", "Z", "Poziom", "GS", "NM", "ETA"], arr)
-    + table(`Odloty z ${esc(icao)}`, depRows.length, depHead, dep) + viffNote
-    + (pre ? `<h4>Prefile <span class="hint">(${t.prefiles.length})</span></h4><div class="mono hint">${pre}</div>` : "");
+// Ruch: paski postępu lotu w widoku RUCH (strips.js); w PRZEGLĄDZIE tylko jednowierszowe podsumowanie
+function ruchLine(t, icao) {
+  const local = t.departures.filter((p) => p.arrival === icao).length;
+  const n = (v, one, few, many) => `<b>${v}</b> ${v === 1 ? one : v % 10 >= 2 && v % 10 <= 4 && (v % 100 < 10 || v % 100 >= 20) ? few : many}`;
+  return `<div class="ruch-line"><span><s class="lg dep"></s>${n(t.departures.length - local, "odlot", "odloty", "odlotów")}</span>
+    <span><s class="lg arr"></s>${n(t.arrivals.length, "przylot", "przyloty", "przylotów")}</span>
+    ${local ? `<span><s class="lg loc"></s>${n(local, "lokalny", "lokalne", "lokalnych")}</span>` : ""}
+    ${t.prefiles.length ? `<span><s class="lg plan"></s>${n(t.prefiles.length, "prefile", "prefile", "prefile")}</span>` : ""}
+</div>`;
 }
 
 function windText(p) {
@@ -248,7 +212,7 @@ export default {
         <input class="field ad" list="ad-list" size="10" placeholder="ICAO">
         <datalist id="ad-list"></datalist>
         <button class="btn primary go">Pokaż</button>
-        <span class="ad-view"><button data-view="overview">PRZEGLĄD</button><button data-view="awos">AWOS</button></span>
+        <span class="ad-view"><button data-view="overview">PRZEGLĄD</button><button data-view="awos">AWOS</button><button data-view="ruch">RUCH</button></span>
         <span class="title" style="font-weight:600"></span><span style="flex:1"></span>
         <span class="hint upd"></span>
       </div>
@@ -258,18 +222,17 @@ export default {
     const $ = (s) => pane.querySelector(s);
     let icao = lsGet("aerodrome.icao") || ctx.config.default_aerodrome || "EPWA";
     let timer = null;
-    // widok: PRZEGLĄD (siatka poniżej) albo AWOS (awos.js, własne zegary, sprzątane przez destroy)
-    let view = lsGet("aerodrome.view") === "awos" ? "awos" : "overview", awos = null;
+    // widok: PRZEGLĄD (siatka poniżej), AWOS (awos.js) albo RUCH (paski EFES, strips.js); AWOS i RUCH mają własne
+    // zegary sprzątane przez destroy()
+    let view = ["awos", "ruch"].includes(lsGet("aerodrome.view")) ? lsGet("aerodrome.view") : "overview", awos = null, strips = null;
 
     api("/api/aerodromes").then((ads) => {
       $("#ad-list").innerHTML = ads.map((a) => `<option value="${a.icao}">${esc(a.name)}</option>`).join("");
     });
 
-    const renderTraffic = async (el) => {
+    const renderRuch = async (el) => {
       try {
-        const [t, viff] = await Promise.all([api(`/api/vatsim/airport/${icao}`),
-          api(`/api/viff/departures/${icao}`).catch((e) => ({ error: e.message, flights: [] }))]);
-        el.innerHTML = trafficHtml(t, icao, viff);
+        el.innerHTML = ruchLine(await api(`/api/vatsim/airport/${icao}`), icao);
       } catch (e) { el.innerHTML = `<span class="error">${esc(e.message)}</span>`; }
     };
 
@@ -325,7 +288,7 @@ export default {
     };
 
     // Układ na jeden ekran: trzy kolumny, długie listy przewijają się wewnątrz swoich okienek
-    // (checklista jest tylko w zakładce CHECKLIST). Szkielet budujemy raz na lotnisko, dane odświeżamy co minutę.
+    // (checklista jest tylko w zakładce CHECKLIST, loty w widoku RUCH). Szkielet budujemy raz na lotnisko, dane odświeżamy co minutę.
     const build = () => {
       $(".content").innerHTML = `
         <div class="ad-errors"></div>
@@ -338,14 +301,15 @@ export default {
           <div class="ad-col">
             <div class="values compact"></div>
             <div class="card"><h3>Pasy</h3><div class="ad-rwys"></div></div>
-            <div class="card"><h3>TAF</h3><div class="ad-taf wx"></div></div>
-            <div class="card grow"><h3>Ruch VATSIM</h3><div class="scroll ad-traffic"><span class="hint">Ładowanie…</span></div></div>
+            <div class="card grow"><h3>TAF</h3><div class="scroll ad-taf wx"></div></div>
+            <div class="card ad-ruch" title="Pokaż paski postępu lotu (widok RUCH)"><h3>Ruch VATSIM<span class="ruch-go">paski ›</span></h3><div class="ad-ruch-line"><span class="hint">Ładowanie…</span></div></div>
           </div>
           <div class="ad-col">
             <div class="card part"><h3>Częstotliwości · online · rezerwacje</h3><div class="scroll freqs"></div></div>
             <div class="card grow"><h3>NOTAM</h3><div class="scroll notams"></div></div>
           </div>
         </div>`;
+      $(".ad-ruch").addEventListener("click", () => setView("ruch"));
       renderNotams($(".notams"));
     };
 
@@ -389,7 +353,7 @@ export default {
       $(".ad-atis").innerHTML = st.atis ? `<div class="mono atis-text">${st.atis.lines.map(esc).join("<br>")}</div>`
         : `<span class="hint">${st.network_error ? esc(st.network_error) : "ATIS nie jest teraz nadawany w sieci VATSIM."}</span>`;
       renderFreqs($(".freqs"), info);
-      renderTraffic($(".ad-traffic"));
+      renderRuch($(".ad-ruch-line"));
       if (++ticks % 10 === 0) renderNotams($(".notams"));
     };
 
@@ -403,10 +367,21 @@ export default {
       clearInterval(timer);
       awos?.destroy();
       awos = null;
+      strips?.destroy();
+      strips = null;
       pane.querySelectorAll(".ad-view button").forEach((b) => b.classList.toggle("active", b.dataset.view === view));
       if (view === "awos") {
         $(".title").textContent = $(".upd").textContent = "";
         awos = mountAwos($(".content"), icao);
+        return;
+      }
+      if (view === "ruch") {
+        $(".title").textContent = icao;
+        $(".upd").textContent = "";
+        strips = mountStrips($(".content"), icao, { onUpdate: (d) => {
+          $(".title").textContent = `${d.icao} · ${d.name}  (elev ${fmt(d.elevation_ft, 0)} ft)`;
+          $(".upd").textContent = `Aktualizacja ${d.now.slice(0, 2)}:${d.now.slice(2)}Z · co 30 s`;
+        } });
         return;
       }
       build();
@@ -414,16 +389,23 @@ export default {
       timer = setInterval(load, 60000);
     };
     $(".go").addEventListener("click", () => go());
-    $(".ad-view").addEventListener("click", (e) => {
-      const b = e.target.closest("button[data-view]");
-      if (!b || b.dataset.view === view) return;
-      view = b.dataset.view;
+    const setView = (v) => {
+      if (v === view) return;
+      view = v;
       lsSet("aerodrome.view", view);
       go(icao);
+    };
+    $(".ad-view").addEventListener("click", (e) => {
+      const b = e.target.closest("button[data-view]");
+      if (b) setView(b.dataset.view);
     });
     $(".ad").addEventListener("keydown", (e) => e.key === "Enter" && go());
     $(".ad").addEventListener("change", () => go());
-    // AWOS już pokazuje to lotnisko: zostaje (wybrany pas, otwarta nakładka, wykrywanie nowej litery ATIS)
-    return { activate: (arg) => { if (!(awos && (arg || icao).toUpperCase() === icao)) go(arg || icao); } };
+    // AWOS już pokazuje to lotnisko: zostaje (wybrany pas, otwarta nakładka, wykrywanie nowej litery ATIS).
+    // RUCH tego lotniska: zostaje (zaznaczony pasek, przewinięcie zatok), tylko wznawia odświeżanie co 30 s.
+    return { activate: (arg) => {
+      if (strips && (arg || icao).toUpperCase() === icao) return strips.resume();
+      if (!(awos && (arg || icao).toUpperCase() === icao)) go(arg || icao);
+    } };
   },
 };

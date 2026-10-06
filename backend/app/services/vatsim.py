@@ -143,13 +143,43 @@ def airport_atc(controllers: list[dict]) -> dict[str, dict[str, list[dict]]]:
     return out
 
 
+# Pełny typ w planie lotu ICAO: "B738/M-SDE2E3FGHIRWXY/LB1" (typ/kategoria turbulencji-wyposażenie).
+# Myślnik jest wymagany: w formacie FAA "B738/L" litera po ukośniku to wyposażenie, nie turbulencja.
+_FP_WAKE = re.compile(r"^(?:\d+/)?[A-Z0-9]{2,4}/([LMHJ])-")
+
+
+def fp_wake(aircraft: str | None) -> str | None:
+    """Kategoria turbulencji (L/M/H/J) z pełnego typu statku powietrznego w planie lotu."""
+    m = _FP_WAKE.match((aircraft or "").strip().upper())
+    return m.group(1) if m else None
+
+
+def assigned_squawk(fp: dict | None) -> str | None:
+    """Kod SSR przydzielony przez ATC (assigned_transponder); '0000' i puste = brak przydziału."""
+    v = str((fp or {}).get("assigned_transponder") or "").strip()
+    return v if re.fullmatch(r"[0-7]{4}", v) and v != "0000" else None
+
+
+def level_ft(value) -> int | None:
+    """Poziom z planu lotu w stopach: '37000', 'FL370', 'F370', 'A045', '370' (setki stóp)."""
+    s = str(value or "").strip().upper()
+    if m := re.fullmatch(r"(?:FL|F|A)(\d{2,3})", s):
+        return int(m.group(1)) * 100
+    if s.isdigit():
+        return int(s) * 100 if int(s) < 1000 else int(s)
+    return None
+
+
 def pilot_info(p: dict) -> dict:
     fp = p.get("flight_plan") or {}
     return {"callsign": p.get("callsign"), "cid": p.get("cid"), "name": p.get("name"),
             "lat": p.get("latitude"), "lon": p.get("longitude"), "altitude": p.get("altitude"),
             "groundspeed": p.get("groundspeed"), "heading": p.get("heading"), "squawk": p.get("transponder"),
             "aircraft": fp.get("aircraft_short"), "departure": fp.get("departure"), "arrival": fp.get("arrival"),
-            "route": fp.get("route"), "rfl": fp.get("altitude"), "rules": fp.get("flight_rules")}
+            "route": fp.get("route"), "rfl": fp.get("altitude"), "rules": fp.get("flight_rules"),
+            # paski postępu lotu (AERODROME › RUCH)
+            "deptime": fp.get("deptime"), "aircraft_icao": fp.get("aircraft"), "wake": fp_wake(fp.get("aircraft")),
+            "assigned_squawk": assigned_squawk(fp), "remarks": fp.get("remarks")}
 
 
 RWY = r"(\d{2}[LRC]?)"
@@ -222,7 +252,9 @@ def airport_traffic(feed: dict, icao: str, lat: float | None = None, lon: float 
             out["prefiles"].append({"callsign": p.get("callsign"), "name": p.get("name"), "cid": p.get("cid"),
                                     "aircraft": fp.get("aircraft_short"), "departure": fp.get("departure"),
                                     "arrival": fp.get("arrival"), "deptime": fp.get("deptime"),
-                                    "rfl": fp.get("altitude"), "rules": fp.get("flight_rules")})
+                                    "rfl": fp.get("altitude"), "rules": fp.get("flight_rules"),
+                                    "route": fp.get("route"), "aircraft_icao": fp.get("aircraft"),
+                                    "wake": fp_wake(fp.get("aircraft")), "remarks": fp.get("remarks")})
     out["arrivals"].sort(key=lambda x: (x["dist_nm"] is None, x["dist_nm"] or 0))
     out["departures"].sort(key=lambda x: (x["state"] != "ground", x["dist_nm"] or 0))
     out["prefiles"].sort(key=lambda x: x.get("deptime") or "")
