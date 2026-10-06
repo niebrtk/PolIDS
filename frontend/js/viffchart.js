@@ -6,6 +6,7 @@ import { esc } from "./api.js";
 const BAND = { H: "górny", M: "środkowy", L: "dolny" };
 const FIR_PART = { ALLFIR: "cały FIR", NFIR: "FIR północ", SFIR: "FIR południe" };
 
+// ta sama logika co tv_label w backend/app/services/viff.py
 export function tvLabel(id) {
   const code = id.replace(/^EP-/, "");
   let m = /^([A-Z])([HML])$/.exec(code);
@@ -17,8 +18,8 @@ export function tvLabel(id) {
   return "kombinacja sektorów";
 }
 
-export const tvGroup = (tv) => (tv.status === 1 ? "Aktywne (regulowane)" : /^EP-[A-Z][HML]$/.test(tv.id) ? "Sektory ACC"
-  : /TMA/.test(tv.id) ? "TMA" : "Kombinacje i FIR");
+// aktywny = status 1 w vIFF albo członek aktywnego scenariusza (backend liczy to w polu active)
+export const tvGroup = (tv) => (tv.active ?? tv.status === 1 ? "aktywne" : "nieaktywne");
 
 export function loadClass(n, cap) {
   if (!cap || n === null || n === undefined) return "nolim";
@@ -33,15 +34,30 @@ export function loadRatio(tv) {
   return Math.max(e, o);
 }
 
-export function listRow(tv, selected) {
+// wiersz TV z paskiem obciążenia; tv = null, gdy vIFF nie podał danych sektora
+export function listRow(tv, selected, id = tv?.id) {
+  if (!tv) return `<button class="vf-row" data-tv="${esc(id)}" title="${esc(tvLabel(id))}"><b>${esc(id)}</b><span class="vf-bar"></span><span class="vf-num">–</span></button>`;
   const r = loadRatio(tv);
   const cls = r > 1 ? "over" : r >= 0.9 ? "near" : r > 0 ? "ok" : "nolim";
   // liczba przy pasku: godzina (bieżąca albo następna) z większym obciążeniem wejść
   const h0 = [...tv.hours].sort((a, b) => (b.entries_cap ? b.entries / b.entries_cap : 0) - (a.entries_cap ? a.entries / a.entries_cap : 0))[0];
-  return `<button class="vf-row ${tv.id === selected ? "on" : ""}" data-tv="${esc(tv.id)}" title="${esc(tvLabel(tv.id))}">
+  const tip = `${tv.id} · ${tvLabel(tv.id)}${h0 ? ` · ${h0.hour}Z: ${h0.entries ?? "–"} wejść / ${h0.entries_cap ?? "bez limitu"}` : ""} · szczyt ${tv.peak_60}${tv.occupancy_cap ? "/" + tv.occupancy_cap : ""} w sektorze`;
+  return `<button class="vf-row ${tv.id === selected ? "on" : ""}" data-tv="${esc(tv.id)}" title="${esc(tip)}">
     <b>${esc(tv.id)}</b><span class="vf-bar"><i class="${cls}" style="width:${Math.min(100, Math.round(r * 100))}%"></i></span>
-    <span class="vf-num" title="${h0 ? esc(h0.hour) + "Z" : ""}">${h0 ? `${h0.entries}/${h0.entries_cap ?? "∞"}` : "–"}</span></button>`;
+    <span class="vf-num">${h0 ? `${h0.entries ?? "–"}/${h0.entries_cap ?? "∞"}` : "–"}</span></button>`;
 }
+
+// Stan lotu jak w liście lotów NM (te same kody i kolory co tabela odlotów w AERODROME)
+const STATE_CLASS = { FI: "fi", SI: "si", SU: "su", AA: "aa", TA: "ta" };
+export function stateChip(v, states) {
+  if (!v) return "";
+  const label = v.state === "SU" && v.suspension ? "SU " + v.suspension.replace(/^FLS-?/, "") : v.state;
+  const tip = [states?.[v.state] || v.state, v.atfcm_status && `vIFF: ${v.atfcm_status}`, v.cdm_status && v.cdm_status !== v.atfcm_status && `CDM: ${v.cdm_status}`]
+    .filter(Boolean).join(" · ");
+  return `<span class="fs fs-${STATE_CLASS[v.state] || "fi"}" title="${esc(tip)}">${esc(label)}</span>${v.ready ? ` <span class="fs fs-rea" title="REA: gotowy do odlotu przed slotem">REA</span>` : ""}`;
+}
+// kolory opóźnienia CTOT jak w liście lotów NM: < 15 min niebieski, < 30 żółty, < 45 pomarańczowy, ≥ 45 czerwony
+export const delayClass = (d) => (d === null || d === undefined || d < 1 ? "" : d < 15 ? "d15" : d < 30 ? "d30" : d < 45 ? "d45" : "d60");
 
 const clock = (now, m) => {
   const t = (parseInt(now.slice(0, 2), 10) * 60 + parseInt(now.slice(2), 10) + m) % 1440;
@@ -50,8 +66,10 @@ const clock = (now, m) => {
 
 // Wykres: po lewej wejścia na godzinę (vIFF: bieżąca i następna pełna godzina) z linią przepustowości,
 // po prawej liczba samolotów w sektorze minuta po minucie od teraz do +60 min z linią przepustowości chwilowej.
-export function chartHtml(tv, now) {
-  const W = 540, H = 150, top = 14, bottom = 22, plotH = H - top - bottom;
+// Pod wykresem lista lotów jak tabela wyników NM; pilot(cs) → {departure, arrival, aircraft} z VATSIM albo nic,
+// sel = znak lotu otwartego w szczegółach (wiersz podświetlony).
+export function chartHtml(tv, now, pilot = () => null, sel = null) {
+  const W = 540, H = 150, top = 16, bottom = 22, plotH = H - top - bottom;
   // --- wejścia / h
   const hours = tv.hours.length ? tv.hours : [];
   const eMax = Math.max(4, tv.entries_cap || 0, ...hours.map((h) => h.entries || 0)) * 1.1;
@@ -78,18 +96,32 @@ export function chartHtml(tv, now) {
     <text x="${x1 + 3}" y="${oy(tv.occupancy_cap) + 4}" class="vf-capt">${tv.occupancy_cap}</text>` : "";
   const yTicks = (max, y, x) => [0, Math.round(max / 2), Math.floor(max)].map((v) => `<text x="${x}" y="${y(v) + 4}" class="vf-ax end">${v}</text>`).join("");
   const svg = `<svg viewBox="0 0 ${W} ${H}" class="vf-svg">
-    <text x="96" y="${top - 3}" class="vf-sub">wejścia / godz.${tv.entries_cap ? "" : " (bez limitu)"}</text>
+    <line x1="26" x2="170" y1="${top + plotH}" y2="${top + plotH}" class="vf-base"/><line x1="${x0}" x2="${x1}" y1="${top + plotH}" y2="${top + plotH}" class="vf-base"/>
+    <text x="96" y="${top - 5}" class="vf-sub">Wejścia / godz.${tv.entries_cap ? "" : " (bez limitu)"}</text>
     ${yTicks(eMax / 1.1, ey, 24)}${bars}${eCap}
-    <text x="${(x0 + x1) / 2}" y="${top - 3}" class="vf-sub">samoloty w sektorze (teraz → +60 min)</text>
+    <text x="${(x0 + x1) / 2}" y="${top - 5}" class="vf-sub">Zajętość: samoloty w sektorze (teraz → +60 min)</text>
     ${ticks}${yTicks(oMax / 1.1, oy, x0 - 6)}<path d="${path}" class="vf-occ vf-${oCls}"/>${oCap}
   </svg>`;
-  const fls = (tv.flights || []).map((f) => `<span class="${f.airborne ? "" : "vf-gnd"}" title="${f.airborne ? "w powietrzu" : "jeszcze na ziemi / planowany"}">${esc(f.callsign)} ${esc(f.entry)}–${esc(f.exit)}</span>`).join("");
-  return `<div class="vf-head"><b>${esc(tv.id)}</b><span>${esc(tvLabel(tv.id))}</span>
-      <span class="hint">${tv.status === 1 ? "aktywny w vIFF · " : ""}${tv.volumes.length ? esc(tv.volumes.join(", ")) : ""}</span>
-      <button class="btn vf-close" title="Zamknij wykres">✕</button></div>
+  const rows = (tv.flights || []).map((f) => {
+    const p = pilot(f.callsign);
+    return `<tr data-cs="${esc(f.callsign)}" class="${f.airborne ? "" : "gnd"}${f.callsign === sel ? " on" : ""}" title="${f.airborne ? "w powietrzu" : "jeszcze na ziemi / planowany"} · kliknij: szczegóły lotu">
+      <td class="cs">${esc(f.callsign)}</td><td>${esc(p?.departure || "–")}</td><td>${esc(p?.arrival || "–")}</td><td>${esc(p?.aircraft || "–")}</td>
+      <td class="t">${esc(f.entry)}</td><td class="t">${esc(f.exit)}</td></tr>`;
+  }).join("");
+  const active = tv.active ?? tv.status === 1;
+  return `<div class="vf-title"><span class="vf-kind">Traffic volume</span><b>${esc(tv.id)}</b><span class="vf-desc">${esc(tvLabel(tv.id))}</span>
+      ${active ? `<span class="vs-chip on">AKTYWNY</span>` : `<span class="vs-chip">nieaktywny</span>`}
+      <button class="vf-close" title="Zamknij wykres">✕</button></div>
+    <div class="vf-body">
+    <div class="vf-meta">${tv.volumes.length ? `<span title="obszary (airspace volumes)">${esc(tv.volumes.join(", "))}</span>` : ""}
+      ${tv.scenarios?.length ? `<span>scenariusz: ${esc(tv.scenarios.join(", "))}</span>` : ""}
+      <span>przepustowość: <b>${tv.entries_cap ?? "∞"}</b> wejść/h · <b>${tv.occupancy_cap ?? "∞"}</b> naraz</span></div>
     ${svg}
     <div class="vf-legend"><span><i class="vf-ok"></i>&lt; 90 %</span><span><i class="vf-near"></i>90–100 %</span><span><i class="vf-over"></i>&gt; przepustowość</span>
-      <span><i class="vf-capl"></i>przepustowość</span><span class="hint">vIFF ${esc(now.slice(0, 2))}:${esc(now.slice(2))}Z · szczyt ${tv.peak_60}${tv.occupancy_cap ? "/" + tv.occupancy_cap : ""} ·
+      <span><i class="vf-capl"></i>przepustowość</span><span class="vf-stat">vIFF ${esc(now.slice(0, 2))}:${esc(now.slice(2))}Z · szczyt ${tv.peak_60}${tv.occupancy_cap ? "/" + tv.occupancy_cap : ""} ·
       wejścia co 20 min: ${(tv.windows || []).map((w) => w.entries).join(" · ") || "–"}</span></div>
-    ${fls ? `<div class="vf-flights mono">${fls}</div>` : `<div class="hint">brak lotów w ciągu godziny</div>`}`;
+    <div class="vf-fhead">Loty w sektorze w ciągu godziny <span>(${(tv.flights || []).length})</span></div>
+    ${rows ? `<div class="vf-tblwrap"><table class="vf-tbl"><thead><tr><th>Callsign</th><th>ADEP</th><th>ADES</th><th>Typ</th><th>Wejście</th><th>Wyjście</th></tr></thead>
+      <tbody>${rows}</tbody></table></div>` : `<div class="vf-empty">brak lotów w ciągu godziny</div>`}
+    </div>`;
 }

@@ -2,6 +2,9 @@ import { api, esc, h } from "../api.js";
 
 const CHANGES = [
   ["06.10.2026", "Nowy wygląd w stylu EUROCONTROL NM UI (panele z paskiem tytułu, gęste tabele, płaskie przyciski), zakładki i kolory bez zmian. Bez poświaty w napisach. Po uruchomieniu zawsze strona startowa „?”."],
+  ["06.10.2026", "AERODROME: widok AWOS (wiatr DEP/ARR lub TDZ/MID/END, QNH/QFE, LVP, ATIS), godziny wschodu i zachodu słońca, wyśrodkowane tabele."],
+  ["06.10.2026", "METEO: mapa QNH regionalnego jak w vAWOS (sektory, TMA, ramki z QNH)."],
+  ["06.10.2026", "MAP: przepustowość sektorów najpierw jako aktywne scenariusze vIFF, pod nimi lista TV; status lotu jak w NM UI z wejściami w sektory; legenda w zakładkach."],
   ["06.10.2026", "RADIO: przyciski szybkiego skoku do lotnisk. PHRASEOLOGY: znów ramka z linkiem do Learning Zone."],
   ["05.10.2026", "AERODROME: odloty z vIFF (EOBT, CTOT, status lotu, na EPWA TOBT/TSAT/AOBT/TTOT) zamiast RFL/GS/poziomu, bez checklisty, kt w tabeli pasów, róża wiatrów z ARR/DEP i pasem sugerowanym (kreskowanie)."],
   ["05.10.2026", "MAP: TMA i CTR, ruch vs przepustowość sektorów z vIFF na godzinę naprzód, sylwetki samolotów, karta lotniska z METAR, kontrolerami i ATIS, plakietki tylko w FIR EPWW, VOR/NDB domyślnie ukryte."],

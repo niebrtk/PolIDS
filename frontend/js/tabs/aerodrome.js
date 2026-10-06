@@ -1,5 +1,6 @@
-import { api, esc, fmt, h, hhmm, positionTip, vatsimBookings, vatsimOnline } from "../api.js";
+import { api, esc, fmt, h, hhmm, positionTip, vatsimBookings, vatsimOnline, lsGet, lsSet } from "../api.js";
 import { colorize, wxLines } from "./meteo.js";
+import { mountAwos } from "../awos.js";
 
 const TYPE_ORDER = ["CTR", "FSS", "APP", "DEP", "TWR", "GND", "DEL", "ATIS"];
 const byType = (a, b) => TYPE_ORDER.indexOf(a.callsign.split("_").pop()) - TYPE_ORDER.indexOf(b.callsign.split("_").pop()) || a.callsign.localeCompare(b.callsign);
@@ -87,10 +88,10 @@ function windrose(status) {
       const [x, y] = pt(e.heading + 180, 88);
       const col = ro.length ? USE_COLOR[ro[0]] : "#c8ced4";
       marks += `<text x="${x}" y="${y + 3}" text-anchor="middle" font-family="monospace" font-weight="700"
-        font-size="${ro.length ? 16 : 12}" fill="${col}" stroke="#000" stroke-width="3" paint-order="stroke">${esc(e.designator)}</text>`;
+        font-size="${ro.length ? 16 : 12}" fill="${col}">${esc(e.designator)}</text>`;
       if (ro.length) {
         marks += `<text x="${x}" y="${y + 15}" text-anchor="middle" font-family="monospace" font-weight="700" font-size="10"
-          fill="${col}" stroke="#000" stroke-width="3" paint-order="stroke">${ro.map((k) => ROLE_LABEL[k]).join("/")}${ra.length ? "" : "?"}</text>`;
+          fill="${col}">${ro.map((k) => ROLE_LABEL[k]).join("/")}${ra.length ? "" : "?"}</text>`;
         // szewrony wzdłuż pasa w kierunku ruchu
         marks += `<g transform="rotate(${e.heading} ${c} ${c})" fill="none" stroke="#fff" stroke-width="2.5" opacity="${ra.length ? 1 : 0.7}">${[48, 12, -24]
           .map((o) => `<polyline points="${c - 5},${c + o + 6} ${c},${c + o} ${c + 5},${c + o + 6}" stroke="#000" stroke-width="5"/><polyline points="${c - 5},${c + o + 6} ${c},${c + o} ${c + 5},${c + o + 6}"/>`).join("")}</g>`;
@@ -222,6 +223,16 @@ function windText(p) {
   return `${dir}°/${p.wind_speed}${p.wind_gust ? "G" + p.wind_gust : ""} kt`;
 }
 
+// Wschód i zachód słońca oraz zmierzch cywilny (BMCT/EECT) dla lotniska, czas UTC (backend: services/sun.py)
+function sunBox(sun) {
+  if (!sun) return "";
+  const t = (v) => esc(v || "–");
+  return `<div class="sunbox ${sun.day ? "day" : "night"}" title="Słońce w UTC: BMCT = początek zmierzchu cywilnego rano, EECT = koniec wieczorem">
+    <div class="label">Słońce UTC · ${sun.day ? "dzień" : "noc"}</div>
+    <div><span>Wschód</span><b>${t(sun.sunrise)}</b><span>Zachód</span><b>${t(sun.sunset)}</b></div>
+    <div class="hint">BMCT ${t(sun.civil_dawn)} · EECT ${t(sun.civil_dusk)}</div></div>`;
+}
+
 function value(label, v, extra = "") {
   return `<div class="card"><div class="label">${label}</div><div class="val">${v}</div>${extra}</div>`;
 }
@@ -237,6 +248,7 @@ export default {
         <input class="field ad" list="ad-list" size="10" placeholder="ICAO">
         <datalist id="ad-list"></datalist>
         <button class="btn primary go">Pokaż</button>
+        <span class="ad-view"><button data-view="overview">PRZEGLĄD</button><button data-view="awos">AWOS</button></span>
         <span class="title" style="font-weight:600"></span><span style="flex:1"></span>
         <span class="hint upd"></span>
       </div>
@@ -244,8 +256,10 @@ export default {
     </div>`);
     root.append(pane);
     const $ = (s) => pane.querySelector(s);
-    let icao = localStorage.getItem("aerodrome.icao") || ctx.config.default_aerodrome || "EPWA";
+    let icao = lsGet("aerodrome.icao") || ctx.config.default_aerodrome || "EPWA";
     let timer = null;
+    // widok: PRZEGLĄD (siatka poniżej) albo AWOS (awos.js, własne zegary, sprzątane przez destroy)
+    let view = lsGet("aerodrome.view") === "awos" ? "awos" : "overview", awos = null;
 
     api("/api/aerodromes").then((ads) => {
       $("#ad-list").innerHTML = ads.map((a) => `<option value="${a.icao}">${esc(a.name)}</option>`).join("");
@@ -259,7 +273,7 @@ export default {
       } catch (e) { el.innerHTML = `<span class="error">${esc(e.message)}</span>`; }
     };
 
-    let notamSort = localStorage.getItem("notam.sort") || "id";
+    let notamSort = lsGet("notam.sort") || "id";
     const renderNotams = async (el) => {
       if (!el.innerHTML) el.innerHTML = `<span class="hint">Ładowanie NOTAM…</span>`;
       let data;
@@ -279,7 +293,7 @@ export default {
         const b = e.target.closest("button[data-sort]");
         if (!b) return;
         notamSort = b.dataset.sort;
-        localStorage.setItem("notam.sort", notamSort);
+        lsSet("notam.sort", notamSort);
         draw();
       };
       draw();
@@ -340,7 +354,8 @@ export default {
       let info, st;
       try {
         [info, st] = await Promise.all([api(`/api/aerodromes/${icao}`), api(`/api/aerodromes/${icao}/status`)]);
-      } catch (e) { $(".ad-errors").innerHTML = `<p class="error">${esc(e.message)}</p>`; return; }
+      } catch (e) { if (view === "overview") $(".ad-errors").innerHTML = `<p class="error">${esc(e.message)}</p>`; return; }
+      if (view !== "overview") return; // w międzyczasie przełączono na AWOS
       const p = st.parsed || {};
       $(".title").textContent = `${info.icao} · ${info.name}  (elev ${fmt(info.elevation_ft, 0)} ft)`;
       $(".upd").textContent = "Aktualizacja " + new Date().toISOString().slice(11, 16) + "Z";
@@ -352,6 +367,7 @@ export default {
       $(".metar-head").innerHTML = `
           <div class="wx">${colorize(st.metar)}</div>
           <div class="obs ${age !== null && age > 70 ? "stale" : ""}">${p.time ? `obs. ${esc(p.time.slice(2, 4))}:${esc(p.time.slice(4, 6))}Z` : ""}${age !== null ? ` · ${age} min temu` : ""}</div>
+          ${sunBox(st.sun)}
           ${lvpBox(st.lvp)}`;
       $(".ad-wind").innerHTML = `${windrose(st)}
             <div class="big">${windText(p).replace(/G\d+/, "")}${gust}</div>
@@ -380,18 +396,34 @@ export default {
     const go = (code) => {
       icao = (code || $(".ad").value || icao).trim().toUpperCase();
       $(".ad").value = icao;
-      localStorage.setItem("aerodrome.icao", icao);
+      lsSet("aerodrome.icao", icao);
       sub.querySelectorAll("button").forEach((b) => b.classList.toggle("active", b.dataset.ad === icao));
       history.replaceState(null, "", "#aerodrome/" + icao);
       ticks = 0;
+      clearInterval(timer);
+      awos?.destroy();
+      awos = null;
+      pane.querySelectorAll(".ad-view button").forEach((b) => b.classList.toggle("active", b.dataset.view === view));
+      if (view === "awos") {
+        $(".title").textContent = $(".upd").textContent = "";
+        awos = mountAwos($(".content"), icao);
+        return;
+      }
       build();
       load();
-      clearInterval(timer);
       timer = setInterval(load, 60000);
     };
     $(".go").addEventListener("click", () => go());
+    $(".ad-view").addEventListener("click", (e) => {
+      const b = e.target.closest("button[data-view]");
+      if (!b || b.dataset.view === view) return;
+      view = b.dataset.view;
+      lsSet("aerodrome.view", view);
+      go(icao);
+    });
     $(".ad").addEventListener("keydown", (e) => e.key === "Enter" && go());
     $(".ad").addEventListener("change", () => go());
-    return { activate: (arg) => go(arg || icao) };
+    // AWOS już pokazuje to lotnisko: zostaje (wybrany pas, otwarta nakładka, wykrywanie nowej litery ATIS)
+    return { activate: (arg) => { if (!(awos && (arg || icao).toUpperCase() === icao)) go(arg || icao); } };
   },
 };

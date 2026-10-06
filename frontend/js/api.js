@@ -148,3 +148,11 @@ export function splitTaf(raw) {
   });
   return lines.map((l) => l.join(" "));
 }
+
+// localStorage bywa niedostępny (tryb prywatny, zablokowane dane witryny): odczyt i zapis zawsze w try
+export function lsGet(key) {
+  try { return localStorage.getItem(key); } catch { return null; }
+}
+export function lsSet(key, value) {
+  try { localStorage.setItem(key, value); } catch { /* tryb prywatny */ }
+}

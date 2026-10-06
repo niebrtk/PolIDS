@@ -1,5 +1,5 @@
 import { BASEMAPS, LIGHT_BASEMAPS, api, atcPositions, esc, h, hhmm, vatsimAtc, vatsimOnline } from "../api.js";
-import { chartHtml, listRow, loadRatio, tvGroup, tvLabel } from "../viffchart.js";
+import { chartHtml, delayClass, listRow, loadRatio, stateChip, tvGroup, tvLabel } from "../viffchart.js";
 import { FACILITIES, PLANE_PATH, SymbolMarker, aircraftMarker, airportBadge, atcPanes, drawFirs, drawSectors, fl, loadFirs, sectorOwners, symbolFor, symbolSvg } from "../airspace.js";
 
 // Kolory zależne od podkładu (ciemny / jasny)
@@ -12,6 +12,40 @@ const THEME = {
 const KIND_COLOR = { aerodrome: "ad", vor: "vor", ndb: "ndb", fix: "fix", vfr: "vfr" };
 const sw = (cls, label, checked = false, sym = "") => `<label class="sw"><input type="checkbox" class="${cls}" ${checked ? "checked" : ""}>
   <span class="sw-sym">${sym}</span><span>${label}</span></label>`;
+const PLANE_SVG = `<svg class="sym" width="18" height="18" viewBox="-10 -10 20 20"><path d="${PLANE_PATH}" class="acsym"/></svg>`;
+// localStorage bywa niedostępny (tryb prywatny): odczyt i zapis zawsze w try
+const store = {
+  get: (k, d) => { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch { return d; } },
+  set: (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* tryb prywatny */ } },
+};
+// liczebnik z rzeczownikiem po polsku: 1 punkt, 2 punkty, 5 punktów
+const plural = (n, one, few, many) => `${n} ${n === 1 ? one : [2, 3, 4].includes(n % 10) && ![12, 13, 14].includes(n % 100) ? few : many}`;
+const lg = (sym, label, cls = "") => `<div class="lgx-i ${cls}"><span class="lgx-s">${sym}</span><span>${label}</span></div>`;
+// Legenda w zakładkach (zwinięta domyślnie razem z całą sekcją)
+const LEGEND = [
+  ["air", "Przestrzeń", () => [
+    lg(`<span class="swatch sec"></span>`, "sektor EPWW (kontur)"), lg(`<span class="swatch on"></span>`, "sektor obsadzony (online)"),
+    lg(`<span class="swatch unicom"></span>`, "sektor bez kontrolera (UNICOM 122.800)"), lg(`<span class="lg-freq">133.475</span>`, "częstotliwość sektora"),
+    lg(`<span class="swatch tma"></span>`, "TMA (wypełniona, gdy APP online)"), lg(`<span class="swatch ctr"></span>`, "CTR (wypełniona, gdy TWR online)"),
+    lg(`<span class="swatch fir"></span>`, "granica FIR sąsiedniego")].join("")],
+  ["pts", "Punkty", () => [
+    lg(`<i data-sym="aerodrome"></i>`, "lotnisko"), lg(`<i data-sym="vor"></i>`, "VOR / DME"), lg(`<i data-sym="ndb"></i>`, "NDB"),
+    lg(`<i data-sym="vfr"></i>`, "punkt VFR"), lg(`<i data-sym="fix"></i>`, "punkt FIX"), lg(`<span class="swatch awy"></span>`, "droga lotnicza"),
+    lg(PLANE_SVG, "samolot VATSIM"), lg(`<span class="lg-line lg-flight"></span>`, "trasa wybranego samolotu"),
+    lg(`<span class="lg-line lg-route"></span>`, "trasa wpisana ręcznie")].join("")],
+  ["atc", "Kontrolerzy", (ctx) => `${FACILITIES.map(([k, l, n]) => lg(`<span class="ab ab-${k.toLowerCase()}">${l}</span>`, n)).join("")}
+    ${lg(`<span class="ab ab-ctr">CTR</span>`, "Control (FIR)")}
+    <p class="lgx-note">Najedź na plakietkę, żeby zobaczyć, kto jest online. Oficjalna mapa sektorów:
+      <a href="${esc(ctx.config.links.sectors)}" target="_blank" rel="noopener">plvacc.pl/acc-sectors ↗</a></p>`],
+  ["viff", "vIFF", () => [
+    lg(`<span class="swatch viff"></span>`, "obszar TV z wykresu"), lg(`<span class="vs-chip on">AKTYWNY</span>`, "scenariusz / TV aktywny"),
+    lg(`<span class="vf-bar"><i class="ok" style="width:60%"></i></span>`, "obciążenie &lt; 90 %"), lg(`<span class="vf-bar"><i class="near" style="width:95%"></i></span>`, "90–100 %"),
+    lg(`<span class="vf-bar"><i class="over" style="width:100%"></i></span>`, "ponad przepustowość"), lg(`<span class="vf-bar"><i class="nolim" style="width:40%"></i></span>`, "bez limitu"),
+    lg(`<span class="fs fs-fi">FI</span>`, "plan złożony"), lg(`<span class="fs fs-si">SI</span>`, "slot (CTOT)"), lg(`<span class="fs fs-su">SU</span>`, "zawieszony (FLS)"),
+    lg(`<span class="fs fs-aa">AA</span>`, "aktywowany (AOBT)"), lg(`<span class="fs fs-ta">TA</span>`, "w powietrzu (ATOT)"),
+    lg(`<span class="fd-ctot d15">+10</span><span class="fd-ctot d30">+20</span><span class="fd-ctot d45">+40</span><span class="fd-ctot d60">+50</span>`, "opóźnienie CTOT w minutach (jak w liście lotów NM)", "w"),
+  ].join("")],
+];
 
 export default {
   mount(root, ctx) {
@@ -19,22 +53,21 @@ export default {
       <div class="mapside">
         <div class="ms-head"><b>MAPA</b><span class="hint">AIRAC ${esc(ctx.config.airac?.ident || "")}</span>
           <button class="btn ms-hide" title="Schowaj panel">«</button></div>
-        <section class="ms-card">
+        <section class="ms-card" data-sec="traffic">
           <h4>Ruch VATSIM</h4>
-          ${sw("traffic", "samoloty", true, `<svg class="sym" width="18" height="18" viewBox="-10 -10 20 20"><path d="${PLANE_PATH}" class="acsym"/></svg>`)}
+          ${sw("traffic", "samoloty", true, PLANE_SVG)}
           ${sw("traffic-detail", "etykiety z FL, typem i GS")}
           ${sw("atc", "kontrolerzy online: plakietki (FIR EPWW, u sąsiadów tylko APP)", true, `<span class="ab ab-twr">T</span>`)}
           <div class="atc-info hint"></div>
           <div class="traffic-info hint"></div>
-          <div class="flight" style="display:none"></div>
         </section>
-        <section class="ms-card">
+        <section class="ms-card" data-sec="route">
           <h4>Trasa</h4>
           <textarea class="field route" rows="3" placeholder="np. EPKK OKENO N871 POLON L980 VAMPU EPGD"></textarea>
           <div class="ms-row"><button class="btn primary show-route">Pokaż trasę</button><button class="btn clear-route">Wyczyść</button></div>
           <div class="route-info hint"></div>
         </section>
-        <section class="ms-card">
+        <section class="ms-card" data-sec="air">
           <h4>Przestrzeń</h4>
           <div class="ms-row"><label class="hint">Poziom</label><span class="flbox">FL<input type="number" class="field fl" value="300" min="0" max="660" step="5"></span></div>
           ${sw("sectors", "sektory EPWW", true, `<span class="swatch sec"></span>`)}
@@ -44,14 +77,15 @@ export default {
           ${sw("firs", "granice FIR-ów sąsiednich (VATSpy)", true, `<span class="swatch fir"></span>`)}
           <div class="sector-info hint"></div>
         </section>
-        <section class="ms-card">
+        <section class="ms-card vf-card" data-sec="viff">
           <h4>Przepustowość sektorów (vIFF)</h4>
           ${sw("viff", "ruch i przepustowość na godzinę naprzód", true, `<span class="swatch viff"></span>`)}
+          <div class="vs-list"></div>
+          <div class="vs-sub">Wszystkie sektory (traffic volumes)</div>
           <select class="field viff-tv"><option value="">wybierz sektor…</option></select>
-          <div class="viff-list"></div>
           <div class="viff-info hint"></div>
         </section>
-        <section class="ms-card">
+        <section class="ms-card" data-sec="points">
           <h4>Punkty i drogi</h4>
           ${sw("ads", "lotniska", true, `<i data-sym="aerodrome"></i>`)}
           ${sw("navaids", "VOR / DME", false, `<i data-sym="vor"></i>`)}
@@ -61,27 +95,17 @@ export default {
           ${sw("airways", "drogi lotnicze <small>(zoom ≥ 7)</small>", false, `<span class="swatch awy"></span>`)}
           ${sw("labels", "nazwy punktów", true)}
         </section>
-        <section class="ms-card">
+        <section class="ms-card" data-sec="base">
           <h4>Podkład</h4>
           <div class="seg">${[["dark", "ciemny"], ["light", "jasny"], ["white", "biały"], ["osm", "OSM"]]
             .map(([v, l]) => `<button data-base="${v}" class="${v === "dark" ? "on" : ""}">${l}</button>`).join("")}</div>
           ${sw("openaip", "nakładka lotnicza OpenAIP")}
           <div class="hint openaip-note"></div>
         </section>
-        <section class="ms-card legend">
+        <section class="ms-card lgx" data-sec="legend">
           <h4>Legenda</h4>
-          <div class="lg"><span class="lg-line lg-flight"></span>trasa wybranego samolotu</div>
-          <div class="lg"><span class="lg-line lg-route"></span>trasa wpisana ręcznie</div>
-          <div class="lg"><span class="swatch on"></span>sektor obsadzony (online)</div>
-          <div class="lg"><span class="swatch tma"></span>TMA (wypełniona, gdy APP online)</div>
-          <div class="lg"><span class="swatch ctr"></span>CTR (wypełniona, gdy TWR online)</div>
-          <div class="lg"><span class="swatch unicom"></span>sektor bez kontrolera (UNICOM 122.800)</div>
-          <div class="lg"><span class="swatch viff"></span>sektor wybrany na wykresie vIFF</div>
-          <div class="lg"><span class="lg-freq">133.475</span>częstotliwość obsadzonego sektora</div>
-          <div class="lg lg-atc">${FACILITIES.map(([k, l, n]) => `<span><span class="ab ab-${k.toLowerCase()}">${l}</span>${n}</span>`).join("")}
-            <span><span class="ab ab-ctr">CTR</span>Control (FIR)</span></div>
-          <p class="hint">Najedź na plakietkę, żeby zobaczyć, kto jest online.</p>
-          <p class="hint">Oficjalna mapa sektorów: <a href="${esc(ctx.config.links.sectors)}" target="_blank" rel="noopener">plvacc.pl/acc-sectors ↗</a></p>
+          <div class="lgx-tabs">${LEGEND.map(([k, l]) => `<button data-lg="${k}">${l}</button>`).join("")}</div>
+          ${LEGEND.map(([k, , body]) => `<div class="lgx-body" data-lg="${k}">${body(ctx)}</div>`).join("")}
         </section>
       </div>
       <button class="btn ms-show" title="Pokaż panel">»</button>
@@ -92,7 +116,7 @@ export default {
     const mapEl = $(".map");
     const map = L.map(mapEl, { preferCanvas: true, zoomSnap: 0.5 }).setView([52.0, 19.3], 6);
     const key = ctx.config.carto_api_key;
-    let baseName = localStorage.getItem("map.base") || "dark";
+    let baseName = (() => { try { return localStorage.getItem("map.base"); } catch { return null; } })() || "dark";
     let base = null;
     let theme = THEME.dark;
     const layers = {
@@ -108,6 +132,24 @@ export default {
       i.outerHTML = `<i data-sym="${i.dataset.sym}">${symbolSvg(i.dataset.sym, THEME.dark[KIND_COLOR[i.dataset.sym]])}</i>`;
     });
     paintLegend();
+
+    // Sekcje panelu zwijane kliknięciem w nagłówek (stan w localStorage); legenda domyślnie zwinięta
+    const secs = store.get("map.sections", {});
+    pane.querySelectorAll(".ms-card[data-sec]").forEach((c) => {
+      const k = c.dataset.sec;
+      c.classList.toggle("shut", secs[k] ?? k === "legend");
+      const h4 = c.querySelector("h4");
+      h4.classList.add("ms-tog");
+      h4.title = "Zwiń / rozwiń";
+      h4.addEventListener("click", () => { secs[k] = c.classList.toggle("shut"); store.set("map.sections", secs); });
+    });
+    const legendTab = (k) => {
+      k = LEGEND.some(([x]) => x === k) ? k : LEGEND[0][0];
+      pane.querySelectorAll(".lgx [data-lg]").forEach((el) => el.classList.toggle("on", el.dataset.lg === k));
+      store.set("map.legend.tab", k);
+    };
+    $(".lgx-tabs").addEventListener("click", (e) => { const b = e.target.closest("button[data-lg]"); if (b) legendTab(b.dataset.lg); });
+    legendTab(store.get("map.legend.tab", "air"));
 
     const setBase = (name) => {
       baseName = BASEMAPS[name] ? name : "dark";
@@ -279,15 +321,22 @@ export default {
     setInterval(() => document.body.contains(pane) && loadSectors(), 60000);
 
     // --- vIFF: ruch vs przepustowość sektorów (traffic volumes) na godzinę naprzód.
-    // Lista najbardziej obciążonych sektorów w panelu, wykres wybranego sektora na mapie, obrys sektora na mapie.
+    // W panelu najpierw scenariusze (aktywne na górze) z ich TV, pod nimi lista wszystkich TV; wykres wybranego TV
+    // z listą lotów w lewym dolnym rogu mapy, obrys TV na mapie.
     let viffData = null;
-    let viffSel = localStorage.getItem("map.viff.tv") ?? null;
+    let viffSel = store.get("map.viff.sel", null);
+    let pilots = [], pilotIdx = new Map();
+    let chartSel = null;  // lot, do którego tabela wykresu była już przewinięta
     const chart = L.control({ position: "bottomleft" });
     chart.onAdd = () => {
       const el = L.DomUtil.create("div", "viff-chart");
       L.DomEvent.disableClickPropagation(el);
       L.DomEvent.disableScrollPropagation(el);
-      el.addEventListener("click", (e) => { if (e.target.closest(".vf-close")) selectTv(""); });
+      el.addEventListener("click", (e) => {
+        if (e.target.closest(".vf-close")) { selectTv(""); return; }
+        const r = e.target.closest("tr[data-cs]");
+        if (r) showFlight(r.dataset.cs);
+      });
       return el;
     };
     chart.addTo(map);
@@ -312,31 +361,68 @@ export default {
       L.geoJSON({ type: "FeatureCollection", features: feats }, { interactive: false,
         style: { color: "#ffd400", weight: 2.6, opacity: 0.95, fillColor: "#ffd400", fillOpacity: 0.025 } }).addTo(layers.viff);
     };
+    // warunki aktywacji scenariusza (vIFF sam decyduje, czy jest aktywny; pokazujemy tylko warunki)
+    const scnCond = (s) => {
+      const b = (xs, sep) => xs.map((x) => `<b>${esc(x)}</b>`).join(sep);
+      const out = [];
+      if (s.positions.length) out.push(`gdy online: ${b(s.positions, " + ")}`);
+      if (s.anypositions.length) out.push(`gdy online: ${b(s.anypositions, " lub ")}`);
+      if (s.nopositions.length) out.push(`i offline: ${b(s.nopositions, ", ")}`);
+      if (s.booked) out.push("liczą się też rezerwacje");
+      if (s.start && s.end && !(s.start === "0000" && s.end === "2359")) out.push(`godz. <b>${esc(s.start)}–${esc(s.end)}</b>`);
+      s.times.forEach((t) => out.push(`${t.date ? esc(t.date) + " " : ""}godz. <b>${esc(t.from)}–${esc(t.to)}</b>`));
+      return out.join(" · ") || "bez warunków";
+    };
+    const scnHtml = (s, byId) => `<div class="vs-scn ${s.active ? "on" : ""}"${s.description ? ` title="${esc(s.description)}"` : ""}>
+        <div class="vs-top"><b>${esc(s.id)}</b>${s.active ? `<span class="vs-chip on">AKTYWNY</span>` : ""}<span class="vs-n">${s.tvs.length} TV</span></div>
+        <div class="vs-cond">${scnCond(s)}</div>
+        ${s.tvs.map((t) => listRow(byId[t.id], viffSel, t.id)).join("")}</div>`;
+    const renderChart = () => {
+      const tv = (viffData?.sectors || []).find((t) => t.id === viffSel);
+      const show = !!tv && $(".viff").checked;
+      const keep = chartEl.querySelector(".vf-tblwrap")?.scrollTop || 0;
+      chartEl.style.display = show ? "" : "none";
+      chartEl.innerHTML = show ? chartHtml(tv, viffData.now, (cs) => pilotIdx.get(cs), selected) : "";
+      const w = chartEl.querySelector(".vf-tblwrap");
+      if (w) w.scrollTop = keep;
+      // nowo wybrany lot spoza widocznej części tabeli: przewiń do jego wiersza
+      const r = selected !== chartSel && w?.querySelector("tr.on");
+      if (r && (r.offsetTop < w.scrollTop + 20 || r.offsetTop + r.offsetHeight > w.scrollTop + w.clientHeight)) w.scrollTop = r.offsetTop - w.clientHeight / 2;
+      if (show) chartSel = selected;
+      fitFd();
+      return show ? tv : null;
+    };
     const drawViff = () => {
-      const list = viffData?.sectors || [];
-      const tv = list.find((t) => t.id === viffSel);
-      const groups = {};
-      list.forEach((t) => (groups[tvGroup(t)] ||= []).push(t));
-      $(".viff-tv").innerHTML = `<option value="">wybierz sektor…</option>` + Object.entries(groups).map(([g, ts]) =>
-        `<optgroup label="${esc(g)}">${ts.map((t) => `<option value="${esc(t.id)}" ${t.id === viffSel ? "selected" : ""}>${esc(t.id)} · ${esc(tvLabel(t.id))}</option>`).join("")}</optgroup>`).join("");
-      const top = [...list].sort((a, b) => loadRatio(b) - loadRatio(a)).slice(0, 6);
-      $(".viff-list").innerHTML = top.length ? `<div class="hint">Najbardziej obciążone w ciągu godziny (wejścia / przepustowość na godzinę):</div>${top.map((t) => listRow(t, viffSel)).join("")}` : "";
-      chartEl.style.display = tv && $(".viff").checked ? "" : "none";
-      chartEl.innerHTML = tv ? chartHtml(tv, viffData.now) : "";
-      drawTvArea($(".viff").checked ? tv : null);
+      const list = viffData?.sectors || [], scns = viffData?.scenarios || [];
+      const byId = Object.fromEntries(list.map((t) => [t.id, t]));
+      const act = scns.filter((s) => s.active), off = scns.filter((s) => !s.active);
+      $(".vs-list").innerHTML = !viffData || !$(".viff").checked ? "" : !scns.length ? `<div class="vs-none">vIFF nie podał scenariuszy</div>`
+        : `<div class="vs-sub">Scenariusze <span>aktywne: ${act.length} z ${scns.length}</span></div>
+        ${act.map((s) => scnHtml(s, byId)).join("") || `<div class="vs-none">żaden scenariusz nie jest teraz aktywny</div>`}
+        ${off.length ? `<details class="vs-more" ${store.get("map.viff.off", false) ? "open" : ""}><summary>Nieaktywne scenariusze (${off.length})</summary>
+          ${off.map((s) => scnHtml(s, byId)).join("")}</details>` : ""}`;
+      // wszystkie TV: aktywne (status 1 albo w aktywnym scenariuszu) i nieaktywne
+      const groups = { aktywne: [], nieaktywne: [] };
+      list.forEach((t) => groups[tvGroup(t)].push(t));
+      $(".viff-tv").innerHTML = `<option value="">wybierz sektor…</option>` + Object.entries(groups).filter(([, ts]) => ts.length).map(([g, ts]) =>
+        `<optgroup label="${g} (${ts.length})">${ts.map((t) => `<option value="${esc(t.id)}" ${t.id === viffSel ? "selected" : ""}>${esc(t.id)} · ${esc(tvLabel(t.id))}</option>`).join("")}</optgroup>`).join("");
+      drawTvArea(renderChart());
     };
     const selectTv = (id) => {
       viffSel = id;
-      try { localStorage.setItem("map.viff.tv", id); } catch { /* tryb prywatny */ }
+      store.set("map.viff.sel", id);
       drawViff();
     };
     const loadViff = async () => {
-      if (!$(".viff").checked) { chartEl.style.display = "none"; layers.viff.clearLayers(); $(".viff-list").innerHTML = ""; $(".viff-info").textContent = ""; return; }
+      $(".vf-card").classList.toggle("off", !$(".viff").checked);  // wyłączony vIFF: bez scenariuszy i listy TV
+      if (!$(".viff").checked) { chartEl.style.display = "none"; layers.viff.clearLayers(); $(".vs-list").innerHTML = ""; $(".viff-info").textContent = ""; fitFd(); return; }
       try {
         viffData = await api("/api/viff/sectors");
-        // pierwszy raz: od razu wykres najbardziej obciążonego sektora
-        if (viffSel === null && viffData.sectors.length) viffSel = [...viffData.sectors].sort((a, b) => loadRatio(b) - loadRatio(a))[0].id;
-        $(".viff-info").textContent = `${viffData.sectors.length} sektorów vIFF · ${viffData.now.slice(0, 2)}:${viffData.now.slice(2)}Z`;
+        // pierwszy raz: pierwszy TV aktywnego scenariusza, a bez niego najbardziej obciążony
+        if (viffSel === null && viffData.sectors.length) {
+          viffSel = viffData.scenarios?.find((x) => x.active)?.tvs[0]?.id || [...viffData.sectors].sort((a, b) => loadRatio(b) - loadRatio(a))[0].id;
+        }
+        $(".viff-info").textContent = `${viffData.sectors.length} TV · ${plural(viffData.scenarios?.length || 0, "scenariusz", "scenariusze", "scenariuszy")} · stan ${viffData.now.slice(0, 2)}:${viffData.now.slice(2)}Z`;
       } catch (e) {
         viffData = null;
         $(".viff-info").innerHTML = `<span class="error">${esc(e.message)}</span>`;
@@ -345,7 +431,8 @@ export default {
     };
     $(".viff").addEventListener("change", loadViff);
     $(".viff-tv").addEventListener("change", (e) => selectTv(e.target.value));
-    $(".viff-list").addEventListener("click", (e) => { const b = e.target.closest("[data-tv]"); if (b) selectTv(b.dataset.tv); });
+    $(".vs-list").addEventListener("click", (e) => { const b = e.target.closest("[data-tv]"); if (b) selectTv(b.dataset.tv); });
+    $(".vs-list").addEventListener("toggle", (e) => { if (e.target.matches?.(".vs-more")) store.set("map.viff.off", e.target.open); }, true);
     setInterval(() => document.body.contains(pane) && $(".viff").checked && loadViff(), 60000);
 
     // --- kontrolerzy online: plakietki lotnisk (D/G/T/A/APP) jak w VATSIM Radar; CTR rysuje drawFirs
@@ -372,7 +459,7 @@ export default {
         bindAdCard(m, ap.icao, ads.find((a) => a.icao === ap.icao)?.city || ap.name);
         if (ap.icao.startsWith("EP")) m.on("click", () => ctx.open("aerodrome", ap.icao));
       });
-      $(".atc-info").textContent = $(".atc").checked ? `${shown.length} lotnisk z kontrolerem · ${hhmm(new Date().toISOString())}` : "";
+      $(".atc-info").textContent = $(".atc").checked ? `${plural(shown.length, "lotnisko", "lotniska", "lotnisk")} z kontrolerem · ${hhmm(new Date().toISOString())}` : "";
       drawAds();
     };
     $(".atc").addEventListener("change", loadAtc);
@@ -395,45 +482,163 @@ export default {
       if (route) drawRoute(layers.route, route.points, theme.route);
     };
 
-    // --- samoloty z VATSIM; kliknięcie pokazuje plan lotu i trasę
+    // --- samoloty z VATSIM; kliknięcie otwiera szczegóły lotu (jak "Flight details" w NM UI) w prawym górnym rogu mapy:
+    // VATSIM (pozycja, plan, trasa na mapie) + vIFF (czasy, slot, regulacja, CDM, wejścia w sektory, historia)
     let selected = null, flight = null;
     const redrawFlight = () => {
       layers.flight.clearLayers();
       if (!flight) return;
       if (flight.points.length) drawRoute(layers.flight, flight.points, theme.flight);
     };
+    const fd = { cs: null, vat: undefined, viff: undefined, vatErr: null, viffErr: null };
+    const fdOpen = store.get("map.fd.open", {});
+    const fdCtl = L.control({ position: "topright" });
+    fdCtl.onAdd = () => {
+      const el = L.DomUtil.create("div", "fd-panel");
+      L.DomEvent.disableClickPropagation(el);
+      L.DomEvent.disableScrollPropagation(el);
+      el.addEventListener("click", (e) => {
+        if (e.target.closest(".fd-close")) { closeFlight(); return; }
+        const r = e.target.closest("tr[data-tv]");  // wejście w sektor → wykres tego TV
+        if (!r) return;
+        selectTv(r.dataset.tv);
+        if (!$(".viff").checked) { $(".viff").checked = true; loadViff(); }
+      });
+      el.addEventListener("toggle", (e) => {
+        if (!e.target.matches?.("details[data-x]")) return;
+        fdOpen[e.target.dataset.x] = e.target.open;
+        store.set("map.fd.open", fdOpen);
+      }, true);
+      return el;
+    };
+    fdCtl.addTo(map);
+    const fdEl = fdCtl.getContainer();
+    fdEl.style.display = "none";
+    const chartH = () => (chartEl.style.display === "none" ? 0 : chartEl.offsetHeight);
+    // na wąskiej mapie panel lotu (prawy górny róg) kończy się nad wykresem TV (lewy dolny róg), żeby się nie nakładały
+    const fitFd = () => {
+      const { x: w, y: hgt } = map.getSize(), ch = chartH();
+      const clash = ch && w < chartEl.offsetWidth + 420 + 40;
+      fdEl.style.maxHeight = Math.max(200, hgt - 20 - (clash ? ch + 34 : 0)) + "px";
+    };
+    map.on("resize", fitFd);
+    const t4 = (v) => (v ? esc(v) : "–");
+    const kv = (k, v, tip = "") => `<span class="k"${tip ? ` title="${esc(tip)}"` : ""}>${k}</span><span class="v">${v}</span>`;
+    const alt = (a) => (a === null || a === undefined ? "–" : a >= 6000 ? fl(a) : `${a} ft`);
+    const histTime = (t) => {
+      const [d, hm] = (t || "").split(" ");
+      return !hm ? esc(t) : d === new Date().toISOString().slice(0, 10) ? esc(hm) : `${esc(d.slice(8, 10))}.${esc(d.slice(5, 7))} ${esc(hm)}`;
+    };
+    const renderFd = () => {
+      const { cs, vat: p, viff: v } = fd;
+      if (!cs) { fdEl.style.display = "none"; fdEl.innerHTML = ""; return; }
+      const keep = fdEl.dataset.cs === cs ? fdEl.querySelector(".fd-body")?.scrollTop || 0 : 0;
+      fdEl.dataset.cs = cs;
+      fdEl.style.display = "";
+      fitFd();
+      const adep = v?.departure || p?.departure, ades = v?.arrival || p?.arrival, type = v?.aircraft || p?.aircraft;
+      const head = `<div class="fd-bar"><span>Szczegóły lotu</span><button class="fd-close" title="Zamknij">✕</button></div>
+        <div class="fd-head"><div class="fd-l1"><b class="fd-cs">${esc(cs)}</b>${v ? stateChip(v, v.states) : ""}${v?.landed ? ` <span class="fs fs-fi">wylądował</span>` : ""}</div>
+          <div class="fd-od"><b>${esc(adep || "????")}</b><span class="ar">→</span><b>${esc(ades || "????")}</b>${type ? `<span class="fd-tag">${esc(type)}</span>` : ""}${p?.rules ? `<span class="fd-tag">${p.rules === "V" ? "VFR" : "IFR"}</span>` : ""}</div>
+          ${p ? `<div class="fd-who">${esc(p.name || "")} · CID ${esc(p.cid)}</div>` : v?.cid ? `<div class="fd-who">CID ${esc(v.cid)}</div>` : ""}</div>`;
+      const vat = p === undefined ? `<div class="fd-note">Ładowanie danych VATSIM…</div>`
+        : p ? `<div class="fd-grid g4">${kv("Poziom", alt(p.altitude))}${kv("GS", `${esc(p.groundspeed ?? "–")} kt`)}${kv("SQ", t4(p.squawk))}${kv("HDG", p.heading ?? "–")}
+          ${kv("RFL", t4(p.rfl ? (p.rfl >= 6000 ? fl(p.rfl) : p.rfl) : ""), "z planu lotu VATSIM")}</div>`
+        : `<div class="fd-note">${esc(fd.vatErr)}</div>`;
+      let vf;
+      if (v === undefined) vf = `<div class="fd-note">Ładowanie danych vIFF…</div>`;
+      else if (!v) vf = `<div class="fd-note">${esc(fd.viffErr)}</div>`;
+      else {
+        const dtip = [v.delay !== null && v.delay !== undefined && `opóźnienie ATFM ${v.delay} min (CTOT − EOBT − kołowanie)`, v.ctot_reason && `powód: ${v.ctot_reason}`,
+          v.revised_ctot && `ostatni zmieniony CTOT ${v.revised_ctot}`].filter(Boolean).join(" · ");
+        const ctot = v.ctot ? `<span class="fd-ctot ${delayClass(v.delay)}">${esc(v.ctot)}${v.delay ? ` ${v.delay > 0 ? "+" : ""}${v.delay}` : ""}</span>` : "–";
+        const eet = v.enroute_min !== null && v.enroute_min !== undefined ? `${Math.floor(v.enroute_min / 60)}:${String(v.enroute_min % 60).padStart(2, "0")}` : "–";
+        vf = `<div class="fd-grid g4">
+            ${kv("EOBT", t4(v.eobt))}${kv("TOBT", t4(v.tobt))}${kv("TSAT", t4(v.tsat))}${kv("CTOT", ctot, dtip || "bez slotu")}
+            ${kv("AOBT", t4(v.aobt))}${kv("ATOT", t4(v.atot), "rzeczywisty start")}${kv("TTOT", t4(v.ttot), "planowany start (A-CDM)")}${kv("ETA", t4(v.eta))}
+            ${kv("RFL", t4(v.rfl))}${kv("TAS", v.tas ? v.tas + " kt" : "–")}${kv("EET", eet, "czas lotu z planu")}${kv("Na czas", t4(v.on_time), "pole onTime z vIFF (odchyłka od planu)")}
+          </div>
+          <div class="fd-grid g2">
+            ${kv("Regulacja", v.regulation ? `<b class="fd-reg">${esc(v.regulation)}</b>` : "brak")}${kv("Najbardziej karząca", t4(v.airspace), "most penalising airspace")}
+            ${kv("Przestrzeń teraz", t4(v.actual_airspace))}${kv("Status CDM", esc([v.cdm_status, v.is_cdm && "A-CDM"].filter(Boolean).join(" · ") || "–"), "status CDM vIFF · A-CDM = lotnisko odlotu z A-CDM")}
+            ${kv("Status ATFCM", t4(v.atfcm_status))}${kv("Pas / SID", t4(v.dep_info))}
+          </div>`;
+      }
+      const route = v?.route || p?.route;
+      const rt = `<div class="fd-sec">Trasa (pole 15)${!v?.route && p?.route ? " · plan VATSIM" : ""}</div>
+        <div class="fd-route">${esc(route || "brak trasy")}</div>
+        ${flight?.points?.length ? `<div class="fd-meta">na mapie: ${plural(flight.points.length, "punkt", "punkty", "punktów")} · ${flight.distance_nm} NM${p ? " (trasa z planu VATSIM)" : " (trasa z vIFF)"}</div>` : ""}
+        ${flight?.warnings?.length ? `<div class="fd-warn">${flight.warnings.map(esc).join("<br>")}</div>` : ""}`;
+      const secs = v?.sectors || [], hist = v?.history || [];
+      const sec = !v ? "" : `<details class="fd-x" data-x="sectors" ${fdOpen.sectors ? "open" : ""}><summary>Wejścia w sektory (vIFF) <span>${secs.length}</span></summary>
+        ${secs.length ? `<table class="fd-tbl"><thead><tr><th rowspan="2">TV</th><th rowspan="2">Opis</th><th colspan="2">Planowane</th><th colspan="2">Wyliczone</th></tr>
+          <tr><th>wej.</th><th>wyj.</th><th>wej.</th><th>wyj.</th></tr></thead><tbody>
+          ${secs.map((x) => `<tr data-tv="${esc(x.tv)}" class="${esc(x.state)}" title="${x.state === "now" ? "lot jest teraz w tym sektorze · " : ""}kliknij: wykres sektora">
+            <td class="cs">${esc(x.tv)}</td><td class="d">${esc(x.label)}</td><td class="t">${t4(x.planned_entry)}</td><td class="t">${t4(x.planned_exit)}</td>
+            <td class="t">${t4(x.entry)}</td><td class="t">${t4(x.exit)}</td></tr>`).join("")}</tbody></table>`
+          : `<div class="fd-note">${v.sectors_error ? "vIFF: " + esc(v.sectors_error) : "Brak wejść w sektory EP w danych na dziś."}</div>`}</details>
+        <details class="fd-x" data-x="history" ${fdOpen.history ? "open" : ""}><summary>Historia vIFF <span>${hist.length}</span></summary>
+        ${hist.length ? `<ol class="fd-hist">${hist.map((x) => `<li><span class="t" title="${esc(x.time)}">${histTime(x.time)}</span><span>${esc(x.text)}</span></li>`).join("")}</ol>`
+          : `<div class="fd-note">brak wpisów</div>`}</details>`;
+      fdEl.innerHTML = `${head}<div class="fd-body"><div class="fd-sec">Pozycja (VATSIM)</div>${vat}<div class="fd-sec">Lot (vIFF)</div>${vf}${rt}${sec}</div>`;
+      fdEl.querySelector(".fd-body").scrollTop = keep;
+    };
+    const fitFlight = (f) => {
+      // z prawej miejsce na panel szczegółów lotu, z dołu na wykres TV
+      const pad = { paddingTopLeft: [50, 50], paddingBottomRight: [50 + (fdEl.offsetWidth || 0), 50 + chartH()], maxZoom: 9 };
+      if (f.points.length) map.fitBounds(L.latLngBounds(f.points.map((x) => [x.lat, x.lon])), pad);
+      else if (f.lat !== null && f.lat !== undefined) map.setView([f.lat, f.lon], Math.max(map.getZoom(), 8));
+    };
     const showFlight = async (cs) => {
+      cs = String(cs).trim().toUpperCase();
       selected = cs;
       flight = null;
       layers.flight.clearLayers();
-      const box = $(".flight");
-      box.style.display = "";
-      box.innerHTML = `<span class="hint">Ładowanie planu lotu ${esc(cs)}…</span>`;
-      try {
-        const f = await api(`/api/vatsim/pilots/${encodeURIComponent(cs)}/route`);
+      Object.assign(fd, { cs, vat: undefined, viff: undefined, vatErr: null, viffErr: null });
+      renderFd();
+      drawTraffic();
+      if (viffData) renderChart();  // podświetlenie lotu w tabeli wykresu
+      const vatP = api(`/api/vatsim/pilots/${encodeURIComponent(cs)}/route`).then((f) => {
         if (selected !== cs) return;
-        flight = f;
+        fd.vat = flight = f;
         redrawFlight();
-        if (f.points.length) map.fitBounds(L.latLngBounds(f.points.map((p) => [p.lat, p.lon])), { padding: [50, 50], maxZoom: 9 });
-        else if (f.lat !== null && f.lat !== undefined) map.setView([f.lat, f.lon], Math.max(map.getZoom(), 8));
-        box.innerHTML = `<div class="fl-head"><b>${esc(f.callsign)}</b><span class="hint">${esc(f.name || "")} · ${esc(f.cid)}</span>
-            <button class="btn close-flight" title="Zamknij">✕</button></div>
-          <div class="fl-grid">
-            <span>Typ</span><b>${esc(f.aircraft || "–")}</b><span>Reguły</span><b>${f.rules === "V" ? "VFR" : "IFR"}</b>
-            <span>Z</span><b>${esc(f.departure || "?")}</b><span>Do</span><b>${esc(f.arrival || "?")}</b>
-            <span>Poziom</span><b>${fl(f.altitude)}</b><span>RFL</span><b>${esc(f.rfl || "–")}</b>
-            <span>GS</span><b>${esc(f.groundspeed ?? "–")} kt</b><span>SQ</span><b>${esc(f.squawk || "–")}</b>
-          </div>
-          <div class="fl-route mono">${esc(f.route || "brak trasy")}</div>
-          ${f.points.length ? `<div class="hint">${f.points.length} punktów · ${f.distance_nm} NM</div>` : ""}
-          ${f.warnings.length ? `<div class="hint" style="color:var(--warn)">${f.warnings.map(esc).join("<br>")}</div>` : ""}`;
-      } catch (e) { box.innerHTML = `<span class="error">${esc(e.message)}</span> <button class="btn close-flight">✕</button>`; }
+        fitFlight(f);
+        renderFd();
+      }).catch((e) => {
+        if (selected !== cs) return;
+        fd.vat = null;
+        fd.vatErr = /nie jest online/.test(e.message) ? "Nie ma go teraz w sieci VATSIM." : e.message;
+        renderFd();
+      });
+      const viffP = (/^[A-Z0-9]{2,10}$/.test(cs) ? api(`/api/viff/flight/${encodeURIComponent(cs)}`) : Promise.reject(new Error("vIFF: znak wywoławczy spoza formatu ICAO")))
+        .then((v) => { if (selected === cs) { fd.viff = v; renderFd(); } })
+        .catch((e) => { if (selected === cs) { fd.viff = null; fd.viffErr = e.message; renderFd(); } });
+      await Promise.all([vatP, viffP]);
+      // pilota nie ma w sieci, ale vIFF zna trasę: rozpisujemy ją na punkty i rysujemy
+      if (selected !== cs || fd.vat || !fd.viff?.route) return;
+      try {
+        const r = await api(`/api/nav/route?route=${encodeURIComponent([fd.viff.departure, fd.viff.route, fd.viff.arrival].filter(Boolean).join(" "))}`);
+        if (selected !== cs || !r.points.length) return;
+        flight = r;
+        redrawFlight();
+        fitFlight(r);
+        renderFd();
+      } catch { /* trasa nierozpoznana */ }
     };
-    $(".flight").addEventListener("click", (e) => {
-      if (!e.target.closest(".close-flight")) return;
-      selected = null; flight = null; layers.flight.clearLayers(); $(".flight").style.display = "none";
-    });
-    let pilots = [];
+    const refreshFd = () => {
+      const cs = fd.cs;
+      if (!cs || !fd.viff) return;
+      api(`/api/viff/flight/${encodeURIComponent(cs)}`).then((v) => { if (fd.cs === cs) { fd.viff = v; renderFd(); } })
+        .catch(() => { /* zostają poprzednie dane */ });
+    };
+    setInterval(() => document.body.contains(pane) && refreshFd(), 60000);
+    const closeFlight = () => {
+      selected = null; flight = null; fd.cs = null;
+      layers.flight.clearLayers();
+      renderFd();
+      drawTraffic();
+      if (viffData) renderChart();
+    };
     const drawTraffic = () => {
       layers.traffic.clearLayers();
       if (!$(".traffic").checked) return;
@@ -449,9 +654,13 @@ export default {
       if (!$(".traffic").checked) { layers.traffic.clearLayers(); $(".traffic-info").textContent = ""; return; }
       try {
         pilots = await api("/api/vatsim/pilots?bbox=44,5,60,35");
-        $(".traffic-info").textContent = `${pilots.length} samolotów w Europie Środkowej · ${hhmm(new Date().toISOString())}. Kliknij samolot, żeby zobaczyć trasę.`;
+        $(".traffic-info").textContent = `${plural(pilots.length, "samolot", "samoloty", "samolotów")} w Europie Środkowej · ${hhmm(new Date().toISOString())}. Kliknij samolot: szczegóły lotu i trasa.`;
       } catch (e) { pilots = []; $(".traffic-info").innerHTML = `<span class="error">${esc(e.message)}</span>`; }
+      pilotIdx = new Map(pilots.map((p) => [p.callsign, p]));
+      const q = fd.vat && pilotIdx.get(fd.cs);  // otwarty panel lotu: świeża pozycja z VATSIM
+      if (q) { ["lat", "lon", "altitude", "groundspeed", "heading", "squawk"].forEach((k) => { fd.vat[k] = q[k]; }); renderFd(); }
       drawTraffic();
+      if (viffData) renderChart();  // ADEP/ADES/typ w tabeli lotów wykresu
     };
     $(".traffic").addEventListener("change", loadTraffic);
     $(".traffic-detail").addEventListener("change", drawTraffic);

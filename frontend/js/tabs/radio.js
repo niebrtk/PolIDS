@@ -133,7 +133,7 @@ function accView(pane) {
       const epww = firs.features.find((f) => f.properties.id === "EPWW");
       if (epww) {
         const outline = L.geoJSON(epww, { interactive: false, style: { color: "#9cdc84", weight: 2, fill: false } }).addTo(firLayer);
-        if (!fitted) { map.fitBounds(outline.getBounds(), { padding: [10, 10] }); fitted = true; }
+        if (!fitted) { map.fitBounds(outline.getBounds(), { padding: [10, 10], animate: false }); fitted = true; }
       }
     }
     const online = !$(".split").checked && st.onlineRaw ? sectorOwners(gj, positions, st.online) : null;
