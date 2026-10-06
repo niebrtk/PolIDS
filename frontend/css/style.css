@@ -1,4 +1,6 @@
-/* Wygląd wzorowany na systemie PANDORA (PAŻP): czarne tło, zielone przyciski menu, tekst w kapitalikach. */
+/* Zakładki (lewe menu i podmenu) jak w systemie PANDORA (PAŻP): zielone przyciski w kapitalikach na czarnym tle.
+   Treść zakładek w stylu aplikacji EUROCONTROL NM UI: panele z paskiem tytułu, gęste tabele z cienkimi liniami,
+   płaskie przyciski. Kolorystyka czarno-zielona. Bez poświaty (glow) i cieni pod tekstem: napisy mają być czytelne. */
 :root {
   --bg: #000;
   --panel: #0d0f0d;
@@ -18,10 +20,18 @@
   --cyan: #3ec7e0;
   --mono: "DejaVu Sans Mono", Consolas, "Roboto Mono", monospace;
   --ui: Verdana, "DejaVu Sans", Tahoma, sans-serif;
+  /* NM UI: treść */
+  --sans: "Segoe UI", Roboto, Arial, "Liberation Sans", sans-serif;
+  --head: #111611;        /* pasek tytułu panelu */
+  --head-line: #243024;
+  --row: #0a0c0a;
+  --row-alt: #0f130f;
+  --row-hover: #18221a;
+  --sel: #1d4d15;
 }
 * { box-sizing: border-box; }
 html, body { height: 100%; margin: 0; }
-body { background: var(--bg); color: var(--text); font: 14px/1.35 var(--ui); display: flex; overflow: hidden; }
+body { background: var(--bg); color: var(--text); font: 13px/1.4 var(--sans); display: flex; overflow: hidden; }
 button, input, select, textarea { font: inherit; color: inherit; }
 a { color: var(--green-text); }
 
@@ -29,12 +39,12 @@ a { color: var(--green-text); }
 .gbtn, .menu nav button, .submenu button {
   display: block; width: 100%; margin: 0 0 3px; padding: 7px 6px;
   background: linear-gradient(#45a832, #2f8a22); border: 1px solid #1f5a16; border-radius: 2px;
-  color: #f4fff0; font-weight: 700; font-variant: small-caps; letter-spacing: .5px; text-align: center;
-  cursor: pointer; text-shadow: 0 1px 1px rgba(0,0,0,.45); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  color: #f4fff0; font: 700 14px/1.35 var(--ui); font-variant: small-caps; letter-spacing: .5px; text-align: center;
+  cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .menu nav button:hover, .submenu button:hover { background: linear-gradient(#52bd3c, #36992a); }
 .menu nav button.active, .submenu button.active {
-  background: linear-gradient(#8cff5a, #5fd23a); color: #0b2a06; text-shadow: none; box-shadow: 0 0 10px rgba(110,255,70,.45);
+  background: linear-gradient(#8cff5a, #5fd23a); color: #0b2a06; box-shadow: 0 0 10px rgba(110,255,70,.45);
 }
 .menu nav button.red { background: linear-gradient(#c8372d, #9c241c); border-color: #5c120d; margin-top: 10px; }
 .menu nav button.red.active { background: linear-gradient(#ff5a4a, #e0302a); color: #fff; box-shadow: 0 0 10px rgba(255,60,40,.6); }
@@ -57,32 +67,46 @@ main { flex: 1; min-width: 0; position: relative; }
 iframe.embed { flex: 1; border: 0; width: 100%; background: #fff; }
 
 .toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
+/* pola i przyciski jak w NM UI: płaskie, ciemne, zielone obramowanie po zaznaczeniu */
 .toolbar input, .toolbar select, input.field, textarea.field, select.field {
-  background: #f2f2f2; color: #111; border: 1px solid #888; padding: 5px 8px; border-radius: 2px; }
-.btn { background: linear-gradient(#45a832, #2f8a22); border: 1px solid #1f5a16; color: #fff; padding: 5px 12px; cursor: pointer; border-radius: 2px; font-variant: small-caps; font-weight: 700; }
-.btn:hover { background: linear-gradient(#52bd3c, #36992a); }
-.btn.primary { background: linear-gradient(#8cff5a, #5fd23a); color: #0b2a06; }
+  background: #0d110d; color: var(--text); border: 1px solid #2f3a2f; padding: 4px 8px; border-radius: 3px; outline: none; }
+.toolbar input:focus, .toolbar select:focus, input.field:focus, textarea.field:focus, select.field:focus { border-color: var(--green-hi); }
+select option { background: #0d110d; color: var(--text); }
+.toolbar input[type=checkbox], .toolbar input[type=radio] { padding: 0; accent-color: var(--green); }
+.toolbar label { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.btn { background: #143a10; border: 1px solid #2f7a22; color: #e6ffdc; padding: 4px 12px; cursor: pointer; border-radius: 3px;
+  font: 600 12px/1.4 var(--sans); letter-spacing: .3px; }
+.btn:hover { background: #1d5216; border-color: var(--green-hi); }
+.btn.primary { background: var(--green); border-color: var(--green-hi); color: #fff; }
+.btn.primary:hover { background: #45b032; }
 .muted { color: var(--muted); }
 .error { color: var(--bad); }
 .hint { color: var(--muted); font-size: 12px; }
 .sc { font-variant: small-caps; }
-h2.title { font-variant: small-caps; font-weight: 700; margin: 0 0 12px; font-size: 20px; color: #fff; }
+h2.title { margin: 0 0 12px; padding-left: 8px; border-left: 3px solid var(--green-hi); font: 700 15px/1.3 var(--sans);
+  text-transform: uppercase; letter-spacing: 1px; color: #fff; }
 
-.grid { display: grid; gap: 12px; }
+.grid { display: grid; gap: 10px; }
 .grid.two { grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); }
-.card { background: var(--panel); border: 1px solid var(--line); padding: 10px 12px; }
-.card h3 { margin: 0 0 8px; font-size: 13px; letter-spacing: 1px; color: var(--green-text); font-variant: small-caps; }
+/* panel NM UI: cienka ramka, tytuł w pasku na całą szerokość */
+.card { --cy: 10px; --cx: 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 3px; padding: var(--cy) var(--cx); }
+.card h3 { margin: 0 0 8px; font: 700 11px/1.3 var(--sans); letter-spacing: .8px; text-transform: uppercase; color: var(--green-text); }
+.card > h3:first-child { margin: calc(-1 * var(--cy)) calc(-1 * var(--cx)) 6px; padding: 5px var(--cx); background: var(--head);
+  border-bottom: 1px solid var(--head-line); border-radius: 3px 3px 0 0; }
 .mono, pre { font-family: var(--mono); }
 pre { white-space: pre-wrap; margin: 0; }
 
-/* tabele w stylu PANDORY: naprzemienne pasy */
+/* tabele jak lista lotów NM UI: nagłówek w pasku, cienkie linie między wierszami, delikatne pasy */
 table.data { width: 100%; border-collapse: collapse; }
-table.data th, table.data td { padding: 5px 8px; text-align: left; }
-table.data th { position: sticky; top: 0; background: #111; color: var(--green-text); font-weight: 700; font-variant: small-caps; font-size: 13px; border-bottom: 1px solid var(--line); }
-table.data tbody tr:nth-child(even) td { background: #0e0f0e; }
-table.data tbody tr:nth-child(odd) td { background: #1a1c1a; }
-table.data tr:hover td { background: #262a26 !important; }
-table.data tr.selected td { background: #b0201a !important; color: #fff; }
+table.data th, table.data td { padding: 4px 8px; text-align: left; }
+table.data th { position: sticky; top: 0; z-index: 1; background: var(--head); color: var(--green-text); font: 700 11px/1.3 var(--sans);
+  letter-spacing: .5px; text-transform: uppercase; border-bottom: 1px solid var(--head-line); white-space: nowrap; }
+table.data td { border-bottom: 1px solid #161b16; }
+table.data tbody tr:nth-child(odd) td { background: var(--row); }
+table.data tbody tr:nth-child(even) td { background: var(--row-alt); }
+table.data tr:hover td { background: var(--row-hover) !important; }
+table.data tr.selected td { background: var(--sel) !important; color: #fff; }
+table.data tr.selected td:first-child { box-shadow: inset 3px 0 0 var(--green-hi); }
 table.data td.num { text-align: right; font-family: var(--mono); }
 
 /* METAR kolorowany jak w PANDORZE */
@@ -97,7 +121,7 @@ table.data td.num { text-align: right; font-family: var(--mono); }
 .wx .nil { color: var(--bad); }
 .wx .trend { color: var(--yellow); }
 .wx .row { padding: 1px 6px; white-space: nowrap; }
-.wx .row:nth-child(odd) { background: #1a1c1a; }
+.wx .row:nth-child(odd) { background: var(--row-alt); }
 
 .split { display: flex; gap: 12px; height: 100%; min-height: 0; }
 .split > .list { flex: 3; min-width: 0; overflow: auto; }
@@ -107,11 +131,12 @@ table.data td.num { text-align: right; font-family: var(--mono); }
 .cat-VFR { color: var(--ok); } .cat-MVFR { color: var(--cyan); } .cat-IFR { color: var(--bad); } .cat-LIFR { color: #d65cff; }
 .recat-A, .recat-B { color: #ff6a5a; } .recat-C, .recat-D { color: var(--yellow); } .recat-E, .recat-F { color: var(--ok); }
 
-/* RADIO: częstotliwości w białych ramkach; zielona poświata = online, pomarańczowa ramka = rezerwacja */
+/* RADIO: częstotliwości w białych ramkach; zielone tło = online, pomarańczowa przerywana ramka = rezerwacja */
 .freq { display: inline-block; background: #fff; color: #000; font: 700 15px var(--mono); padding: 2px 6px; border: 2px solid #9cdc84; }
-.freq.on { background: #8cff5a; border-color: #5fd23a; box-shadow: 0 0 10px #5fd23a; }
+.freq.on { background: #8cff5a; border-color: #2e8a1c; }
 .freq.booked { border: 2px dashed #ffb020; }
-.radio-section { color: #fff; font-variant: small-caps; font-size: 17px; margin: 6px 0 10px; border-bottom: 1px solid var(--line); padding-bottom: 4px; }
+.radio-section { color: #fff; font: 700 14px/1.3 var(--sans); text-transform: uppercase; letter-spacing: 1px; margin: 10px 0 10px;
+  border-bottom: 1px solid var(--head-line); padding: 0 0 4px 8px; border-left: 3px solid var(--green-hi); }
 .radio-group { display: inline-block; vertical-align: top; margin: 0 22px 18px 0; min-width: 250px; }
 .radio-group h3 { color: var(--yellow); font-variant: small-caps; margin: 0 0 6px; font-size: 15px; }
 .radio-row { display: flex; align-items: center; gap: 8px; margin: 3px 0; position: relative; }
@@ -125,6 +150,16 @@ table.data td.num { text-align: right; font-family: var(--mono); }
 .radio-group h3 small { color: var(--muted); font-variant: normal; font-size: 13px; margin-left: 6px; }
 /* LOTNISKA i sąsiednie FIR-y: jedna kolumna, wyeksponowane ID pozycji, nazwa i częstotliwość */
 .radio-list.single .radio-group { display: block; margin: 0 0 18px; max-width: 980px; }
+/* LOTNISKA: pasek szybkiego skoku do lotniska, przyklejony u góry listy */
+.ad-jump { position: sticky; top: -12px; z-index: 5; display: flex; flex-wrap: wrap; align-items: center; gap: 3px;
+  margin: -12px -16px 8px; padding: 8px 16px; background: #000; border-bottom: 1px solid var(--head-line); }
+.ad-jump .aj-kind { margin: 0 4px 0 10px; font: 700 11px var(--sans); letter-spacing: .8px; color: var(--muted); }
+.ad-jump .aj-kind:first-child { margin-left: 0; }
+.ad-jump button { padding: 2px 6px; background: #0f130f; border: 1px solid #2f3a2f; border-radius: 3px; color: #dfe8df;
+  font: 700 12px var(--mono); cursor: pointer; }
+.ad-jump button:hover { border-color: var(--green-hi); color: #fff; }
+.ad-jump button.on { background: #1d4d15; border-color: var(--green-hi); color: #c9ffb3; }
+.ad-jump button.booked { border-color: #ffb020; border-style: dashed; color: #ffd27a; }
 .radio-list.single .radio-group h3 { font-size: 18px; border-bottom: 1px solid var(--line); padding-bottom: 3px; }
 .radio-list.single .radio-row { gap: 14px; margin: 0; padding: 4px 0; border-bottom: 1px solid #141814; }
 .radio-list.single .freq { font-size: 18px; min-width: 92px; text-align: center; }
@@ -146,7 +181,8 @@ table.data td.num { text-align: right; font-family: var(--mono); }
 
 /* etykiety na mapach (sektory, FIR-y) */
 .maplabel { background: none; border: 0; }
-.maplabel > div { transform: translate(-50%, -50%); text-align: center; white-space: nowrap; font: 11px var(--mono); color: #cfd8cf; text-shadow: 0 0 3px #000, 0 0 3px #000; }
+.maplabel > div { transform: translate(-50%, -50%); text-align: center; white-space: nowrap; font: 11px var(--mono); color: #dfe8df;
+  background: rgba(0,0,0,.72); padding: 1px 4px; border-radius: 2px; }
 .maplabel .freq { font-size: 12px; padding: 0 4px; border-width: 1px; }
 .maplabel .freq.on { box-shadow: none; background: #9dff6e; border-color: #1d5c0c; color: #000; }
 .maplabel .firname { color: #6b756b; font-size: 12px; }
@@ -160,7 +196,7 @@ table.data td.num { text-align: right; font-family: var(--mono); }
 .ad-grid { flex: 1; min-height: 0; display: grid; gap: 8px;
   grid-template-columns: 232px minmax(420px, 1.4fr) minmax(300px, 1fr); }
 .ad-col { display: flex; flex-direction: column; gap: 8px; min-height: 0; min-width: 0; }
-.ad-col > .card { min-height: 0; display: flex; flex-direction: column; padding: 6px 10px; }
+.ad-col > .card { --cy: 6px; --cx: 10px; min-height: 0; display: flex; flex-direction: column; }
 .ad-col > .card h3 { margin-bottom: 4px; flex: none; }
 .ad-col > .card.grow { flex: 1 1 0; }
 .ad-col > .card.part { flex: 0 1 auto; max-height: 40%; }
@@ -179,12 +215,15 @@ table.data td.num { text-align: right; font-family: var(--mono); }
 .ad-col table.data.rwy-table { font-size: 14px; }
 .ad-col table.data.rwy-table td, .ad-col table.data.rwy-table th { padding: 2px 4px; }
 .ad-col table.data.traffic td { font-size: 12px; padding: 1px 5px; }
-.ad-col table.data.traffic th { font-size: 11px; padding: 2px 5px; }
+.ad-col table.data.traffic th { font-size: 10px; padding: 3px 5px; }
+/* AERODROME: zawartość wszystkich tabel wyśrodkowana */
+.ad-pane table.data th, .ad-pane table.data td { text-align: center; }
+.ad-pane table.data.rwy-table { margin: 0 auto; }
 .ad-col .ad-traffic h4 { margin: 4px 0 2px; }
 .ad-col table.data.rwy-table td.rwy { font-size: 17px; }
 .values.compact { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; flex: none; }
-.values.compact .card { padding: 3px 8px; }
-.values .label { color: var(--green-text); font-size: 11px; font-variant: small-caps; letter-spacing: 1px; }
+.values.compact .card { --cy: 3px; --cx: 8px; }
+.values .label { color: var(--green-text); font: 700 10px/1.4 var(--sans); text-transform: uppercase; letter-spacing: .8px; }
 .values .val { font: 20px var(--mono); color: #fff; line-height: 1.25; }
 .values .val .sm { font-size: 14px; }
 .values .hint { font-size: 11px; display: block; }
@@ -204,10 +243,10 @@ table.data td.num { text-align: right; font-family: var(--mono); }
 .lvp-off { color: var(--muted); border-color: var(--line); }
 .lvp-off span { display: inline; margin-left: 6px; }
 .lvp-prep { color: var(--warn); border-color: var(--warn); }
-.lvp-lvp { color: #fff; background: #b0201a; border-color: #ff5a4a; box-shadow: 0 0 10px rgba(255,60,40,.6); }
+.lvp-lvp { color: #fff; background: #b0201a; border-color: #ff5a4a; }
 .lvp[data-tip]:hover::after { left: auto; right: 0; }
 .values { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px; }
-.values .card { padding: 8px; }
+.values .card { --cy: 8px; --cx: 8px; }
 /* AERODROME: tabela pasów zwarta, duże znaki */
 table.data.rwy-table { width: auto; font-size: 16px; }
 table.data.rwy-table th { font-size: 12px; padding: 3px 8px; }
@@ -238,7 +277,7 @@ td.tags .tag { padding: 0 4px; margin-right: 2px; font-size: 11px; }
 .rwy-use .pair b { font: 700 40px var(--mono); color: #fff; }
 .rwy-use .pair span { color: var(--muted); font-size: 12px; margin-left: 6px; }
 .atis-text { font-size: 13px; color: #dfe8ff; }
-.ad-traffic h4 { margin: 6px 0 4px; color: var(--yellow); font-variant: small-caps; }
+.ad-traffic h4 { margin: 6px 0 4px; color: var(--yellow); font: 700 11px/1.3 var(--sans); text-transform: uppercase; letter-spacing: .8px; text-align: center; }
 table.data.traffic td { padding: 2px 6px; font-family: var(--mono); white-space: nowrap; }
 table.data.traffic a.cs { color: var(--cyan); font-weight: 700; text-decoration: none; }
 .notam-bar { display: flex; gap: 6px; align-items: center; margin-bottom: 8px; }
@@ -266,31 +305,32 @@ table.data.traffic a.cs { color: var(--cyan); font-weight: 700; text-decoration:
 .leaflet-tooltip.rtlbl { background: #0b0d10; color: #fff; border: 1px solid #ff9f1a; border-radius: 3px; box-shadow: 0 1px 4px rgba(0,0,0,.6); font: 700 12px var(--mono); padding: 1px 5px; }
 .map.light .leaflet-tooltip.lbl { background: rgba(255,255,255,.85); color: #1b1f24; }
 .map.light .leaflet-tooltip.rtlbl { background: #fff; color: #111; border-color: #d4380d; box-shadow: 0 1px 3px rgba(0,0,0,.3); }
-.map.light .maplabel > div { color: #1b2a1b; text-shadow: 0 0 3px #fff, 0 0 3px #fff; }
+.map.light .maplabel > div { color: #1b2a1b; background: rgba(255,255,255,.85); }
 .map.light .maplabel .firname { color: #5c6670; }
 .map.light .acicon svg { fill: #0b3d91; stroke: #fff; }
-.map.light .acicon span { color: #0b3d91; text-shadow: 0 0 3px #fff, 0 0 3px #fff; }
+.map.light .acicon span { color: #0b3d91; background: rgba(255,255,255,.85); }
 .acicon.sel svg { fill: #ff9f1a; }
 .leaflet-tooltip.qnh { background: transparent; border: 0; box-shadow: none; color: var(--yellow); font: 700 20px var(--mono); text-align: center; }
 .leaflet-tooltip.qnh::before { display: none; }
 
 /* MAP: panel boczny */
-.mapside { width: 310px; flex: none; background: #07090b; border-right: 1px solid var(--line); padding: 8px; overflow: auto; display: flex; flex-direction: column; gap: 8px; }
+.mapside { width: 310px; flex: none; background: #050705; border-right: 1px solid var(--line); padding: 8px; overflow: auto; display: flex; flex-direction: column; gap: 8px; }
 .mapwrap.collapsed .mapside { display: none; }
 .ms-show { display: none; position: absolute; z-index: 500; left: 8px; bottom: 24px; padding: 4px 10px; }
 .mapwrap.collapsed .ms-show { display: block; }
 .ms-head { display: flex; align-items: center; gap: 8px; padding: 2px 4px; }
-.ms-head b { font-size: 15px; letter-spacing: 2px; color: #fff; }
+.ms-head b { font: 700 14px var(--sans); letter-spacing: 2px; color: #fff; }
 .ms-head .ms-hide { margin-left: auto; padding: 1px 9px; }
-.ms-card { background: #0f1317; border: 1px solid #1f262d; border-radius: 6px; padding: 8px 10px; }
-.ms-card h4 { margin: 0 0 6px; font-size: 11px; color: #8fa3b5; text-transform: uppercase; letter-spacing: 1.5px; font-weight: 700; }
+.ms-card { background: var(--panel); border: 1px solid var(--line); border-radius: 3px; padding: 0 10px 8px; }
+.ms-card h4 { margin: 0 -10px 6px; padding: 5px 10px; background: var(--head); border-bottom: 1px solid var(--head-line); border-radius: 3px 3px 0 0;
+  font: 700 11px/1.3 var(--sans); color: var(--green-text); text-transform: uppercase; letter-spacing: .8px; }
 .ms-card textarea { width: 100%; box-sizing: border-box; resize: vertical; font: 12px var(--mono); }
 .ms-row { display: flex; align-items: center; gap: 6px; margin: 4px 0; }
 .flbox { display: inline-flex; align-items: center; gap: 4px; font: 700 13px var(--mono); color: var(--yellow); }
 .flbox input { width: 70px; }
-.sw { display: flex; align-items: center; gap: 8px; padding: 3px 0; cursor: pointer; font-size: 13px; color: #d5dde4; }
+.sw { display: flex; align-items: center; gap: 8px; padding: 3px 0; cursor: pointer; font-size: 13px; color: #dbe3db; }
 .sw small { color: var(--muted); }
-.sw input { appearance: none; -webkit-appearance: none; flex: none; width: 30px; height: 16px; margin: 0; border-radius: 8px; background: #2b333b; position: relative; cursor: pointer; transition: background .15s; }
+.sw input { appearance: none; -webkit-appearance: none; flex: none; width: 30px; height: 16px; margin: 0; border-radius: 8px; background: #2b332b; position: relative; cursor: pointer; transition: background .15s; }
 .sw input::after { content: ""; position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: 50%; background: #9aa6b1; transition: left .15s, background .15s; }
 .sw input:checked { background: var(--green); }
 .sw input:checked::after { left: 16px; background: #fff; }
@@ -306,11 +346,11 @@ table.data.traffic a.cs { color: var(--cyan); font-weight: 700; text-decoration:
 .swatch.awy { height: 0; border-top: 1px solid #5f6b78; border-radius: 0; }
 .swatch.tma { background: rgba(127,149,255,.18); border: 1.5px solid #7f95ff; }
 .swatch.ctr { background: rgba(255,107,107,.22); border: 1.5px dashed #ff6b6b; }
-.seg { display: flex; border: 1px solid #2b333b; border-radius: 5px; overflow: hidden; margin-bottom: 6px; }
-.seg button { flex: 1; background: #12171c; color: #b9c4cd; border: 0; border-right: 1px solid #2b333b; padding: 5px 0; cursor: pointer; font: 12px var(--ui); }
+.seg { display: flex; border: 1px solid #2f3a2f; border-radius: 3px; overflow: hidden; margin-bottom: 6px; }
+.seg button { flex: 1; background: #0d110d; color: #c3cdc3; border: 0; border-right: 1px solid #2f3a2f; padding: 4px 0; cursor: pointer; font: 12px var(--sans); }
 .seg button:last-child { border-right: 0; }
 .seg button.on { background: var(--green); color: #fff; font-weight: 700; }
-.legend .lg { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #c4ccd3; margin: 4px 0; }
+.legend .lg { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #c9d1c9; margin: 4px 0; }
 .lg-line { flex: none; width: 26px; height: 4px; border-radius: 2px; box-shadow: 0 0 0 2px #000; }
 .lg-line.lg-flight { background: #ff9f1a; }
 .lg-line.lg-route { background: #ff4dd2; }
@@ -341,11 +381,11 @@ table.data.traffic a.cs { color: var(--cyan); font-weight: 700; text-decoration:
 
 /* CHECKLIST (format vatiris) */
 .chk-page { max-width: 860px; }
-.chk-section { margin: 14px 0 4px; color: var(--yellow); font-variant: small-caps; font-size: 15px; border-bottom: 1px solid var(--line); }
+.chk-section { margin: 14px 0 4px; padding-bottom: 2px; color: var(--yellow); font: 700 12px/1.4 var(--sans); text-transform: uppercase; letter-spacing: .8px; border-bottom: 1px solid var(--head-line); }
 .chk-row { display: flex; align-items: baseline; gap: 8px; padding: 4px 2px; cursor: pointer; }
-.chk-row > input { flex: none; }
+.chk-row > input { flex: none; accent-color: var(--green); }
 .chk-body { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; }
-.chk-row:hover { background: #12181d; }
+.chk-row:hover { background: var(--row-hover); }
 .chk-row.done .chk-what, .chk-row.done .chk-action { color: #5f6b5f; text-decoration: line-through; }
 .chk-what { flex: 0 1 auto; min-width: 0; }
 .chk-dots { flex: 1 1 12px; border-bottom: 1px dotted #4a524a; min-width: 12px; }
@@ -357,13 +397,28 @@ table.data.traffic a.cs { color: var(--cyan); font-weight: 700; text-decoration:
 .checklist tt { font-family: var(--mono); color: var(--yellow); }
 
 /* ? O PROGRAMIE */
-.about { font-variant: small-caps; font-size: 16px; line-height: 1.6; }
-.logo { font: 900 52px/1 var(--ui); letter-spacing: 6px; color: #fff; font-style: italic; }
-.logo small { display: block; font: 12px var(--ui); letter-spacing: 3px; font-style: normal; color: var(--muted); margin-top: 6px; }
+/* strona startowa: logo, informacje o systemie, kafelki skrótów do zakładek i lista zmian */
+.about { padding: 20px 24px; }
+.about-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; flex-wrap: wrap; margin-bottom: 18px; }
+.about-info { flex: 0 1 560px; }
+.about-info dl.props { gap: 3px 16px; }
+.about-info dl.props dd { font-family: var(--sans); }
+.logo { font: 900 52px/1 var(--ui); letter-spacing: 6px; color: #fff; font-style: italic; padding-top: 6px; }
+.logo small { display: block; font: 12px var(--ui); letter-spacing: 3px; font-style: normal; color: var(--muted); margin-top: 8px; }
+.about-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 8px; margin-bottom: 18px; }
+.about-tile { display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; text-align: left; cursor: pointer; color: var(--text);
+  background: var(--panel); border: 1px solid var(--line); border-left: 3px solid var(--green); border-radius: 3px; font: 12px/1.4 var(--sans); }
+.about-tile b { font: 700 14px var(--ui); font-variant: small-caps; letter-spacing: .5px; color: var(--green-hi); }
+.about-tile span { color: var(--muted); }
+.about-tile:hover { border-color: var(--green-hi); background: #0f160f; }
+.about-tile.red { border-left-color: var(--bad); }
+.about-tile.red b { color: #ff6a5a; }
+.about-changes { max-width: 1200px; }
+.about-changes td.mono { width: 1%; white-space: nowrap; color: var(--muted); }
 
 .photo { width: 100%; height: 340px; border: 1px solid var(--line); background: #000; }
 dl.props { display: grid; grid-template-columns: max-content 1fr; gap: 3px 14px; margin: 0; }
-dl.props dt { color: var(--green-text); font-variant: small-caps; }
+dl.props dt { color: var(--green-text); font: 700 11px/1.75 var(--sans); text-transform: uppercase; letter-spacing: .5px; }
 dl.props dd { margin: 0; font-family: var(--mono); }
 
 /* METEO: TAF w liniach, mapa QNH jak w PANDORZE */
@@ -373,7 +428,7 @@ dl.props dd { margin: 0; font-family: var(--mono); }
 .qnhside .stamp { font-variant: small-caps; color: #dfe8ff; font-size: 16px; margin-bottom: 8px; }
 .qnhnum, .qnhlabel { background: none; border: 0; }
 .qnhnum > div { transform: translate(-50%, -50%); color: #7d9b7d; font: 22px var(--ui); }
-.qnhlabel > div { transform: translate(-50%, -50%); text-align: center; color: #d8e6a8; font-family: var(--ui); line-height: 1; white-space: nowrap; text-shadow: 0 0 4px #000; }
+.qnhlabel > div { transform: translate(-50%, -50%); text-align: center; color: #d8e6a8; font-family: var(--ui); line-height: 1; white-space: nowrap; }
 .qnhlabel .mm { display: flex; justify-content: space-between; font-size: 11px; margin: 0 -10px -2px; }
 .qnhlabel .big { font-size: 30px; }
 .qnhlabel .sub { font-size: 15px; }
@@ -389,13 +444,14 @@ table.callsigns td.minor { font-size: 12px; color: var(--muted); }
 
 /* AIRCRAFT: rekord w dwóch liniach, kod ICAO najważniejszy */
 .ac-rec { display: grid; grid-template-columns: 90px 1fr; column-gap: 12px; padding: 5px 8px; cursor: pointer; font: 14px/1.5 var(--mono); }
-.ac-rec:nth-child(odd) { background: #1a1c1a; }
-.ac-rec:nth-child(even) { background: #0e0f0e; }
-.ac-rec:hover { background: #262a26; }
-.ac-rec.selected { background: #b0201a; color: #fff; }
+.ac-rec { border-bottom: 1px solid #161b16; }
+.ac-rec:nth-child(odd) { background: var(--row); }
+.ac-rec:nth-child(even) { background: var(--row-alt); }
+.ac-rec:hover { background: var(--row-hover); }
+.ac-rec.selected { background: var(--sel); color: #fff; box-shadow: inset 3px 0 0 var(--green-hi); }
 .ac-rec .ac-icao { grid-row: 1 / 3; align-self: center; }
 .ac-icao { font: 700 24px var(--mono); color: #fff; }
-.ac-rec .ac-l2 { color: #cfd4cf; }
+.ac-rec .ac-l2 { color: #cfd4cf; font-size: 13px; }
 .ac-rec.selected .recat-A, .ac-rec.selected .recat-B, .ac-rec.selected .recat-C, .ac-rec.selected .recat-D,
 .ac-rec.selected .recat-E, .ac-rec.selected .recat-F { color: #fff; }
 .photo-box { margin: 6px 0 12px; }
@@ -409,7 +465,8 @@ table.callsigns td.minor { font-size: 12px; color: var(--muted); }
 .acicon { background: none; border: 0; }
 .acicon .ac { position: relative; width: 20px; height: 20px; }
 .acicon svg { width: 20px; height: 20px; fill: #f2d21b; stroke: #000; stroke-width: 1; }
-.acicon span { position: absolute; left: 18px; top: -4px; white-space: nowrap; font: 11px/1.2 var(--mono); color: #f2d21b; text-shadow: 0 0 3px #000, 0 0 3px #000; }
+.acicon span { position: absolute; left: 18px; top: -4px; white-space: nowrap; font: 11px/1.2 var(--mono); color: #f2d21b;
+  background: rgba(0,0,0,.7); padding: 0 3px; border-radius: 2px; }
 
 /* Karta z odnośnikiem do serwisu, który nie daje się osadzić w ramce */
 .ext-card { max-width: 760px; }
@@ -508,3 +565,16 @@ table.data.traffic tr.offline td { opacity: .7; }
 .vf-legend i.vf-capl { height: 0; width: 14px; border-top: 2px dashed #ff5cc8; border-radius: 0; }
 .vf-flights { display: flex; flex-wrap: wrap; gap: 2px 10px; max-height: 54px; overflow: auto; font-size: 11px; color: #dfe8ff; }
 .vf-flights .vf-gnd { color: #8c969e; }
+
+/* ramka z zewnętrzną stroną: uwaga nad ramką (np. serwis może blokować osadzanie) */
+.embed-note { padding: 4px 10px; background: var(--panel); border-bottom: 1px solid var(--line); }
+.embed-note.warn { color: #ffd27a; }
+.card > h3.ac-title:first-child { padding: 6px var(--cx); font: 700 15px/1.3 var(--sans); text-transform: none; letter-spacing: 0; color: #fff; }
+a.btn { text-decoration: none; display: inline-block; }
+
+/* DOCS: lista dokumentów jak lista w NM UI */
+.doc-list .doc-cat { margin: 8px 0 2px; font: 700 10px var(--sans); letter-spacing: .8px; text-transform: uppercase; color: var(--muted); }
+.doc-list .doc-cat:first-child { margin-top: 0; }
+.doc-list a { display: block; padding: 4px 8px; margin: 0 -10px; color: var(--text); text-decoration: none; border-left: 3px solid transparent; }
+.doc-list a:hover { background: var(--row-hover); }
+.doc-list a.on { background: var(--sel); border-left-color: var(--green-hi); color: #fff; }

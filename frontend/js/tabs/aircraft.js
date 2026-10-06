@@ -56,7 +56,7 @@ export default {
 
     const show = (a) => {
       $(".detail").innerHTML = `<div class="card">
-        <h3><span class="ac-icao" style="font-size:26px">${esc(a.icao)}</span> ${esc(a.manufacturer)} ${esc(a.model)}</h3>
+        <h3 class="ac-title"><span class="ac-icao" style="font-size:26px">${esc(a.icao)}</span> ${esc(a.manufacturer)} ${esc(a.model)}</h3>
         <div class="perf-links"><a class="btn" href="${esc(perfUrl(a.icao))}" target="_blank" rel="noopener">EUROCONTROL Aircraft Performance: ${esc(a.icao)} ↗</a>
           <a class="hint" href="${esc(PERF)}" target="_blank" rel="noopener">wyszukiwarka bazy ↗</a></div>
         <div class="photo-box"><span class="hint">Ładowanie zdjęcia…</span></div>

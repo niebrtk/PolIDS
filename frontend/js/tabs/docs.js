@@ -5,9 +5,8 @@ export default {
   mount(root) {
     const wrap = h(`<div class="pane fill"><div class="mapwrap">
       <div class="mapside">
-        <h4>DOKUMENTY</h4>
-        <div class="list"></div>
-        <p class="hint" style="margin-top:14px">Nowe PDF-y wrzuć do folderu <span class="mono">data/docs/</span>
+        <div class="ms-card"><h4>Dokumenty</h4><div class="list doc-list"></div></div>
+        <p class="hint">Nowe PDF-y wrzuć do folderu <span class="mono">data/docs/</span>
         (podfolder = kategoria) i kliknij „Odśwież”.</p>
         <button class="btn refresh">Odśwież</button>
       </div>
@@ -25,13 +24,18 @@ export default {
       }
       const groups = {};
       docs.forEach((d) => (groups[d.category] ||= []).push(d));
-      list.innerHTML = Object.entries(groups).map(([cat, ds]) => `<div class="hint" style="margin-top:8px">${esc(cat)}</div>` +
-        ds.map((d) => `<div style="margin:3px 0"><a href="#" data-url="${esc(d.url)}">${esc(d.title)}</a></div>`).join("")).join("");
+      list.innerHTML = Object.entries(groups).map(([cat, ds]) => `<div class="doc-cat">${esc(cat)}</div>` +
+        ds.map((d) => `<a href="#" data-url="${esc(d.url)}">${esc(d.title)}</a>`).join("")).join("");
       if (!viewer.getAttribute("src")) viewer.src = docs[0].url;
+      list.querySelectorAll("a[data-url]").forEach((a) => a.classList.toggle("on", a.dataset.url === viewer.getAttribute("src")));
     };
     list.addEventListener("click", (e) => {
       const a = e.target.closest("a[data-url]");
-      if (a) { e.preventDefault(); viewer.src = a.dataset.url; }
+      if (!a) return;
+      e.preventDefault();
+      viewer.src = a.dataset.url;
+      list.querySelectorAll("a.on").forEach((x) => x.classList.remove("on"));
+      a.classList.add("on");
     });
     wrap.querySelector(".refresh").addEventListener("click", async () => { await api("/api/import", { method: "POST" }); load(); });
     load();

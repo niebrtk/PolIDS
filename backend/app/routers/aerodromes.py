@@ -13,6 +13,7 @@ from ..services.metar import parse_metar, qfe_from_qnh
 from ..services.runways import equipment_for, runway_config, runway_heading, select_runways, wind_components
 from ..services.vatsim import controller_info, get_feed, parse_atis
 from ..services.weather import get_metars, get_tafs
+from ..services.sun import sun_times
 
 router = APIRouter(prefix="/api/aerodromes", tags=["aerodrome"])
 
@@ -112,7 +113,7 @@ async def status(icao: str, db: Session = Depends(get_db)):
     return {
         "icao": ad.icao, "name": ad.name, "elevation_ft": ad.elevation_ft,
         "metar": metar, "parsed": parsed.to_dict() if parsed else None, "taf": taf,
-        "qfe": qfe, "runways": rwys, "lvp": lvp,
+        "qfe": qfe, "runways": rwys, "lvp": lvp, "sun": sun_times(ad.lat, ad.lon),
         "preferred": pref, "runway_in_use": in_use, "atis": atis, "atc_online": atc, "network_error": net_error,
         # zgodność wstecz
         "suggested_runway": pref["arr"], "suggestion_reason": pref["reason"],

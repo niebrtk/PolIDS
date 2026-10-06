@@ -58,7 +58,7 @@ function row(p) {
 
 let names = {};
 function groupsHtml(groups, empty = "Brak stanowisk.") {
-  return groups.length ? groups.map(([name, ps]) => `<div class="radio-group"><h3>${esc(name)}${names[name] ? ` <small>${esc(names[name])}</small>` : ""}</h3>${ps.map(row).join("")}</div>`).join("")
+  return groups.length ? groups.map(([name, ps]) => `<div class="radio-group" data-group="${esc(name)}"><h3>${esc(name)}${names[name] ? ` <small>${esc(names[name])}</small>` : ""}</h3>${ps.map(row).join("")}</div>`).join("")
     : `<p class="hint">${esc(empty)}</p>`;
 }
 
@@ -74,6 +74,14 @@ function listView(build, { single = true } = {}) {
         pane.querySelector(".netstatus").innerHTML = st.msg;
       } catch (e) { pane.querySelector(".body").innerHTML = `<p class="error">${esc(e.message)}</p>`; }
     };
+    // szybki skok do lotniska z paska przycisków (LOTNISKA)
+    pane.addEventListener("click", (e) => {
+      const b = e.target.closest("[data-jump]");
+      if (!b) return;
+      const g = pane.querySelector(`.radio-group[data-group="${CSS.escape(b.dataset.jump)}"]`);
+      // przewijamy tak, żeby nagłówek lotniska wypadł tuż pod przyklejonym paskiem przycisków
+      if (g) pane.scrollBy({ top: g.getBoundingClientRect().top - pane.getBoundingClientRect().top - b.closest(".ad-jump").offsetHeight - 6, behavior: "smooth" });
+    });
     draw();
     refreshNetwork().then(draw);
     const timer = setInterval(() => refreshNetwork().then(draw), 60000);
@@ -83,13 +91,13 @@ function listView(build, { single = true } = {}) {
 
 function aerodromes(ps) {
   const ad = ps.filter((p) => p.prefix?.startsWith("EP") && p.prefix !== "EPWW" && !isFis(p));
-  const section = (title, filter) => {
-    const g = group(ad.filter((p) => filter(p.prefix)), (p) => p.prefix);
-    return g.length ? `<h2 class="radio-section">${title}</h2>${groupsHtml(g)}` : "";
-  };
-  return section("Lotniska komunikacyjne (AIP IFR)", (x) => IFR.includes(x))
-    + section("Lotniska VFR", (x) => !IFR.includes(x) && !MIL.includes(x))
-    + section("Lotniska wojskowe", (x) => MIL.includes(x));
+  const kinds = [["Lotniska komunikacyjne (AIP IFR)", "IFR", (x) => IFR.includes(x)], ["Lotniska VFR", "VFR", (x) => !IFR.includes(x) && !MIL.includes(x)],
+    ["Lotniska wojskowe", "MIL", (x) => MIL.includes(x)]].map(([title, short, filter]) => ({ title, short, g: group(ad.filter((p) => filter(p.prefix)), (p) => p.prefix) }));
+  // pasek przycisków na górze: kliknięcie przewija do lotniska; zielony = ktoś jest online, pomarańczowy = rezerwacja
+  const state = (ps) => (ps.some((p) => st.online[p.callsign]) ? "on" : ps.some((p) => st.bookings[p.callsign]?.length) ? "booked" : "");
+  const jump = `<div class="ad-jump">${kinds.filter((k) => k.g.length).map((k) => `<span class="aj-kind">${k.short}</span>${k.g.map(([icao, ps]) =>
+    `<button data-jump="${esc(icao)}" class="${state(ps)}" title="${esc(names[icao] || "")}">${esc(icao)}</button>`).join("")}`).join("")}</div>`;
+  return jump + kinds.map((k) => (k.g.length ? `<h2 class="radio-section">${k.title}</h2>${groupsHtml(k.g)}` : "")).join("");
 }
 
 // EPWW ACC: lista stanowisk (najpierw CTR, niżej FIS) i mapa sektorów z aktualnie zalogowanymi

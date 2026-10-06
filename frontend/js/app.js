@@ -19,7 +19,7 @@ const mounted = {};
 const ctx = { config: null, open };
 
 function open(tab, arg) {
-  if (!TABS[tab]) tab = "aerodrome";
+  if (!TABS[tab]) tab = "about";
   document.querySelectorAll("#tabs button").forEach((b) => b.classList.toggle("active", b.dataset.tab === tab));
   views.querySelectorAll(".view").forEach((v) => v.classList.remove("active"));
   if (!mounted[tab]) {
@@ -60,6 +60,6 @@ tick();
     ctx.config = { links: {}, default_aerodrome: "EPWA", airac: {} };
     console.error(e);
   }
-  const [tab, arg] = location.hash.slice(1).split("/");
-  open(tab || "aerodrome", arg);
+  // po uruchomieniu zawsze strona startowa "?" (ABOUT), niezależnie od adresu zapamiętanego w przeglądarce
+  open("about");
 })();
