@@ -1,7 +1,7 @@
 {
- "source": "ese",
- "source_label": "plik sektorowy .ese (EPWW-Sector.ese, AIRAC 2610), listy OWNER",
- "note": "Tymczasowo: kolejność przejmowania z list OWNER pliku .ese. Po wklejeniu tabeli z om.plvacc.pl/docs/2610/ownerships zostanie zastąpiona.",
+ "source": "om",
+ "source_label": "om.plvacc.pl › Sector ownerships and top-down rules (AIRAC 2610)",
+ "note": "Tabele pierwszeństwa z om.plvacc.pl/docs/2610/ownerships (wklejone przez Marka 06.10.2026). Poprawione literówki: ACC G LOW nr 3: EPWW_N_cTR -> EPWW_N_CTR; ACC J MID nr 4: EPWW_E_FIR -> EPWW_E_CTR. Odstępstwa od tabeli (sprzeczna z opisami stanowisk i plikiem .ese): B HIGH: z pliku .ese zamiast tabeli om; C HIGH: z pliku .ese zamiast tabeli om; D HIGH: z pliku .ese zamiast tabeli om; T MID: z pliku .ese zamiast tabeli om.",
  "url": "https://om.plvacc.pl/docs/2610/ownerships",
  "layers": {
   "LOW": {
@@ -390,5 +390,182 @@
    "frequency": "130.625",
    "ese_id": "T"
   }
+ },
+ "tma_topdown": {
+  "TMA Warszawa": {
+   "chain": [
+    "EPWW_C_CTR",
+    "EPWW_NE_CTR",
+    "EPWW_TCJ_CTR",
+    "EPWW_DTC_CTR",
+    "EPWW_S_CTR",
+    "EPWW_E_CTR",
+    "EPWW_N_CTR",
+    "EPWW_ALL_CTR",
+    "EPWW_ALH_CTR"
+   ],
+   "ese_prefixes": [
+    "EPWA_APP_",
+    "EPWA_TMA"
+   ]
+  },
+  "TMA Gdańsk": {
+   "chain": [
+    "EPWW_G_CTR",
+    "EPWW_FG_CTR",
+    "EPWW_N_CTR",
+    "EPWW_DBF_CTR",
+    "EPWW_ALL_CTR",
+    "EPWW_ALH_CTR"
+   ],
+   "ese_prefixes": [
+    "EPGD_TMA",
+    "EPGD_UTMA"
+   ]
+  },
+  "TMA Poznań N": {
+   "chain": [
+    "EPWW_D_CTR",
+    "EPWW_DBT_CTR",
+    "EPWW_DT_CTR",
+    "EPWW_DTC_CTR",
+    "EPWW_DBF_CTR",
+    "EPWW_ALL_CTR",
+    "EPWW_N_CTR",
+    "EPWW_ALH_CTR"
+   ],
+   "ese_prefixes": [
+    "EPPO_TMA_N"
+   ]
+  },
+  "TMA Poznań S": {
+   "chain": [
+    "EPWW_TM_CTR",
+    "EPWW_DT_CTR",
+    "EPWW_TCJ_CTR",
+    "EPWW_DTC_CTR",
+    "EPWW_DBT_CTR",
+    "EPWW_S_CTR",
+    "EPWW_ALL_CTR",
+    "EPWW_ALH_CTR"
+   ],
+   "ese_prefixes": [
+    "EPPO_TMA_S"
+   ]
+  },
+  "TMA Kraków": {
+   "chain": [
+    "EPWW_J_CTR",
+    "EPWW_JR_CTR",
+    "EPWW_S_CTR",
+    "EPWW_TCJ_CTR",
+    "EPWW_E_CTR",
+    "EPWW_ALL_CTR",
+    "EPWW_ALH_CTR"
+   ],
+   "ese_prefixes": [
+    "EPKK_TMA",
+    "EPKK_LTMA",
+    "EPKK_UTMA"
+   ]
+  },
+  "TMA Szczecin": {
+   "chain": [
+    "EPWW_DBT_CTR",
+    "EPWW_DBF_CTR",
+    "EPWW_N_CTR",
+    "EPWW_ALL_CTR",
+    "EPWW_ALH_CTR"
+   ],
+   "ese_prefixes": [
+    "EPSC_TMA"
+   ]
+  },
+  "TMA Mazury": {
+   "chain": [
+    "EPWW_NE_CTR",
+    "EPWW_N_CTR",
+    "EPWW_E_CTR",
+    "EPWW_ALL_CTR",
+    "EPWW_ALH_CTR"
+   ],
+   "ese_prefixes": [
+    "EPSY_TMA"
+   ]
+  },
+  "TMA Lublin": {
+   "chain": [
+    "EPWW_JR_CTR",
+    "EPWW_E_CTR",
+    "EPWW_S_CTR",
+    "EPWW_ALL_CTR",
+    "EPWW_ALH_CTR"
+   ],
+   "ese_prefixes": [
+    "EPLB_TMA"
+   ]
+  },
+  "TMA Rzeszów": {
+   "chain": [
+    "EPWW_JR_CTR",
+    "EPWW_E_CTR",
+    "EPWW_S_CTR",
+    "EPWW_ALL_CTR",
+    "EPWW_ALH_CTR"
+   ],
+   "ese_prefixes": [
+    "EPRZ_TMA"
+   ]
+  }
+ },
+ "ese_differences": [
+  "B HIGH: om DBT DBF N ALH ALL | .ese N ALH DBT DBF ALL",
+  "C HIGH: om TCJ DTC S E N ALH C ALL | .ese DTC S E N ALH TCJ C ALL",
+  "D HIGH: om DBT DT DTC DBF N ALH D ALL | .ese DTC N DBF ALH DT DBT D ALL",
+  "T MID: om TM DT TCJ DTC DBT S ALL | .ese TM DT TCJ DTC DBT S ALH ALL"
+ ],
+ "corrections": [
+  "B HIGH: z pliku .ese zamiast tabeli om",
+  "C HIGH: z pliku .ese zamiast tabeli om",
+  "D HIGH: z pliku .ese zamiast tabeli om",
+  "T MID: z pliku .ese zamiast tabeli om"
+ ],
+ "om_verbatim": {
+  "B HIGH": [
+   "EPWW_DBT_CTR",
+   "EPWW_DBF_CTR",
+   "EPWW_N_CTR",
+   "EPWW_ALH_CTR",
+   "EPWW_ALL_CTR"
+  ],
+  "C HIGH": [
+   "EPWW_TCJ_CTR",
+   "EPWW_DTC_CTR",
+   "EPWW_S_CTR",
+   "EPWW_E_CTR",
+   "EPWW_N_CTR",
+   "EPWW_ALH_CTR",
+   "EPWW_C_CTR",
+   "EPWW_ALL_CTR"
+  ],
+  "D HIGH": [
+   "EPWW_DBT_CTR",
+   "EPWW_DT_CTR",
+   "EPWW_DTC_CTR",
+   "EPWW_DBF_CTR",
+   "EPWW_N_CTR",
+   "EPWW_ALH_CTR",
+   "EPWW_D_CTR",
+   "EPWW_ALL_CTR"
+  ],
+  "T MID": [
+   "EPWW_TM_CTR",
+   "EPWW_DT_CTR",
+   "EPWW_TCJ_CTR",
+   "EPWW_DTC_CTR",
+   "EPWW_DBT_CTR",
+   "EPWW_S_CTR",
+   "EPWW_ALL_CTR"
+  ]
  }
 }
