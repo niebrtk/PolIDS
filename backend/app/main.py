@@ -7,7 +7,7 @@ from fastapi.staticfiles import StaticFiles
 
 from .config import settings
 from .importers.seed import init_db
-from .routers import aerodromes, aircraft, callsigns, docs, meteo, nav, notam, system, vatsim, viff
+from .routers import aerodromes, aircraft, callsigns, docs, meteo, nav, notam, radio, system, vatsim, viff
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
 
@@ -21,7 +21,7 @@ async def lifespan(_app: FastAPI):
 app = FastAPI(title="vPANDORA API", version="0.8.0", lifespan=lifespan,
               description="API dla aplikacji vPANDORA (VATSIM PL vACC). Dokumentacja interaktywna: /docs")
 
-for r in (system, meteo, aerodromes, notam, aircraft, callsigns, nav, vatsim, viff, docs):
+for r in (system, meteo, aerodromes, notam, aircraft, callsigns, nav, radio, vatsim, viff, docs):
     app.include_router(r.router)
 
 

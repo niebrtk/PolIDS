@@ -26,7 +26,8 @@ export const fl = (ft) => "FL" + String(Math.round((ft || 0) / 100)).padStart(3,
 // --- VACS (vacs-data, CC BY-NC-SA 4.0): łańcuchy dziedziczenia sektorów EPWW w warstwach LOW/MID/HIGH.
 // Wczytywane raz przy starcie modułu, żeby sectorOwners() (też w RADIO) miało je od razu.
 let vacsPromise = null, vacsData = null;
-export const loadVacs = () => (vacsPromise ||= api("/api/nav/vacs").then((d) => (vacsData = d))
+// Od rundy 8 kolejność przejmowania z /api/nav/ownership (tymczasowo .ese, docelowo tabela z om.plvacc.pl); kształt jak w VACS.
+export const loadVacs = () => (vacsPromise ||= api("/api/nav/ownership").then((d) => (vacsData = d))
   .catch((e) => { vacsPromise = null; throw e; }));
 loadVacs().catch(() => { /* bez VACS: właściciele z listy OWNER pliku .ese */ });
 export const VACS_LAYERS = ["LOW", "MID", "HIGH"];

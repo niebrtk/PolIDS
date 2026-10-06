@@ -3,8 +3,7 @@
    Bez poświaty: żadnych text-shadow ani cieni wokół pasków. */
 .ad-pane .strips { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 6px; }
 .strips {
-  --strip-font: "Arial Narrow", "Bahnschrift SemiCondensed", Bahnschrift, "Roboto Condensed", "Liberation Sans Narrow",
-    "Nimbus Sans Narrow", "Helvetica Neue", Arial, "Liberation Sans", sans-serif;
+  --strip-font: Consolas, "Liberation Mono", "DejaVu Sans Mono", monospace;
 }
 
 /* pasek informacji: pasy w użyciu, ATIS, A-CDM, legenda */

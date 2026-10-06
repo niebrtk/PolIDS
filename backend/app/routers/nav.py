@@ -161,6 +161,18 @@ def vacs():
     return _vacs()
 
 
+@lru_cache(maxsize=1)
+def _ownership() -> dict:
+    return json.loads((settings.seed_dir / "ownership.json").read_text("utf-8"))
+
+
+@router.get("/ownership")
+def ownership():
+    """Kolejność przejmowania sektorów ACC EPWW w warstwach LOW/MID/HIGH (pole `source` mówi, skąd jest:
+    tymczasowo listy OWNER z pliku .ese, docelowo tabela z om.plvacc.pl/docs/2610/ownerships)."""
+    return _ownership()
+
+
 @router.get("/sectors/online")
 async def sectors_online(fir: str = "EPWW", db: Session = Depends(get_db)):
     """Aktualna sektoryzacja: dla każdego sektora pierwsze zalogowane stanowisko z listy OWNER."""

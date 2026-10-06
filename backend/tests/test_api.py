@@ -171,3 +171,11 @@ def test_vacs_sector_chains(client):
     assert all(cs in d["acc_positions"] for s in d["sectors"].values() for chain in s.values() for cs in chain)
     esmm6 = next(n for n in d["neighbours"] if n["label"] == "ESMM 6")
     assert esmm6["alt"] == "+365" and esmm6["callsign"] == "ESMM_6_CTR"
+
+
+def test_ownership_chains(client):
+    d = client.get("/api/nav/ownership").json()
+    assert d["source"] in ("ese", "om")
+    assert sorted(d["sectors"]) == list("BCDEFGJNRT")
+    assert all(set(s) == {"LOW", "MID", "HIGH"} for s in d["sectors"].values())
+    assert all(cs in d["acc_positions"] for s in d["sectors"].values() for chain in s.values() for cs in chain)

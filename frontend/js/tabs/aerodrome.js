@@ -88,10 +88,10 @@ function windrose(status) {
       // oznaczenie przy progu (z którego startuje / na który ląduje samolot lecący kursem pasa) i rola
       const [x, y] = pt(e.heading + 180, 88);
       const col = ro.length ? USE_COLOR[ro[0]] : "#c8ced4";
-      marks += `<text x="${x}" y="${y + 3}" text-anchor="middle" font-family="monospace" font-weight="700"
+      marks += `<text x="${x}" y="${y + 3}" text-anchor="middle" font-family="Consolas, 'Liberation Mono', monospace" font-weight="700"
         font-size="${ro.length ? 16 : 12}" fill="${col}">${esc(e.designator)}</text>`;
       if (ro.length) {
-        marks += `<text x="${x}" y="${y + 15}" text-anchor="middle" font-family="monospace" font-weight="700" font-size="10"
+        marks += `<text x="${x}" y="${y + 15}" text-anchor="middle" font-family="Consolas, 'Liberation Mono', monospace" font-weight="700" font-size="10"
           fill="${col}">${ro.map((k) => ROLE_LABEL[k]).join("/")}${ra.length ? "" : "?"}</text>`;
         // szewrony wzdłuż pasa w kierunku ruchu
         marks += `<g transform="rotate(${e.heading} ${c} ${c})" fill="none" stroke="#fff" stroke-width="2.5" opacity="${ra.length ? 1 : 0.7}">${[48, 12, -24]
