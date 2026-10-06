@@ -1,6 +1,12 @@
 import { api, esc, h } from "../api.js";
 
 const CHANGES = [
+  ["06.10.2026", "Wersja 0.9.0. RADIO › GEO: kafelki stanowisk jak strony GEO w VACS (bez FMP), z częstotliwościami i tym, kto jest online; obok mapa zasięgu: kliknij jedną lub kilka pozycji (także dowolne stanowiska FIR-ów sąsiednich), żeby zobaczyć, co obsługują. Sąsiedzi: wszystkie stanowiska z pliku .ese i vacs-data, zasięgi z VATSpy."],
+  ["06.10.2026", "RADIO › SEKTORYZACJA (przeniesiona z MAP): kolejność przejmowania sektorów ACC z om.plvacc.pl › ownerships zamiast VACS, lista stanowisk w jednej kolumnie, krótkie nazwy pozycji (PO N APP, EPWW DBF, EDMM MEI, WA TWR)."],
+  ["06.10.2026", "TMA i CTR z pełną kolejnością przejmowania: najpierw APP i TWR z pliku .ese, potem ACC wg om.plvacc.pl. RADIO › SEKTORYZACJA: karta TMA i CTR, stanowiska APP/TWR w symulacji. MAP: dymek TMA, CTA i CTR pokazuje wszystkie stanowiska po kolei z częstotliwością i tym, kto jest online; warstwa CTA (np. CTA 02 nad TMA Warszawa) domyślnie włączona. RADIO › GEO: kafelki sąsiadów w kolorach FIR-ów jak w VACS. Komunikaty po polsku, gdy serwer vPANDORA nie odpowiada."],
+  ["06.10.2026", "MAP: przestrzeń rysowana dla wybranego poziomu (FL) albo dla wszystkich poziomów, listy do wyboru pojedynczych sektorów ACC, TMA, CTR i FIR-ów sąsiednich, opis TMA/CTR po najechaniu, samoloty w kolorach odlot / przylot / tranzyt, ATIS z nazwiskiem kontrolera, bez UNICOM i bez hierarchii dziedziczenia. Naprawione podświetlanie TMA Warszawa przy EPWA APP online."],
+  ["06.10.2026", "METEO: WIND (dawniej WINDY) z przełącznikiem 0 ft / 3000 ft na podejściu (punkt FAF/IAF każdego pasa), METAR i TAF alfabetycznie. AERODROME: wiatr 0 ft i 3000 ft w punktach podejścia (Open-Meteo), pasy ARR/DEP w kolorach listy lotów."],
+  ["06.10.2026", "AIRCRAFT: przyciski AIRBUS, BOEING, EMBRAER, MCDONNELL, ATR, CESSNA. Cała aplikacja w czcionce Consolas."],
   ["06.10.2026", "MAP › SEKTORYZACJA: trzy mapy LOW / MID / HIGH z dziedziczeniem sektorów EPWW przez konkretne stanowiska (łańcuchy z vacs-data), tryb VATSIM teraz i symulacja, tabela kto co obsługuje, różnice względem pliku .ese. Sektoryzacja na głównej mapie i w RADIO liczona tak samo."],
   ["06.10.2026", "RADIO: stanowiska w FIR-ach sąsiednich nazwane jak w profilu VACS ACC_EPWW, z dopiskiem wysokości (np. ESMM 6 +365) i podpowiedzią, kto przejmuje sektor, gdy główne stanowisko jest offline."],
   ["06.10.2026", "AERODROME › RUCH: loty jako paski postępu lotu w stylu EFES (odloty niebieskie, przyloty żółte, loty lokalne różowe), SID/STAR z pliku .ese, czasy vIFF/CDM. PRZEGLĄD bez tabeli lotów."],
@@ -27,11 +33,11 @@ const CHANGES = [
 // kafelki na stronie startowej: skróty do zakładek (jak strona domowa NM UI)
 const TILES = [
   ["aerodrome", "AERODROME", "Lotnisko na jednym ekranie: METAR, wiatr, pasy, ATIS, ruch z vIFF, NOTAM, widok AWOS."],
-  ["meteo", "METEO", "METAR i TAF lotnisk, mapa QNH regionalnego."],
-  ["map", "MAP", "Ruch VATSIM, sektory, TMA/CTR, przepustowość sektorów i status lotu z vIFF."],
-  ["radio", "RADIO", "Częstotliwości, kto jest online i rezerwacje na dziś."],
+  ["meteo", "METEO", "METAR i TAF lotnisk, mapa QNH regionalnego, wiatr przy ziemi i na podejściu."],
+  ["map", "MAP", "Ruch VATSIM, przestrzeń na wybranym poziomie, TMA/CTR, przepustowość sektorów i status lotu z vIFF."],
+  ["radio", "RADIO", "Kafelki GEO z częstotliwościami, zasięg stanowisk na mapie, sektoryzacja, kto jest online i rezerwacje na dziś."],
   ["callsign", "CALLSIGN", "Znaki wywoławcze linii lotniczych."],
-  ["aircraft", "AIRCRAFT", "Typy samolotów, kategorie turbulencji, zdjęcia."],
+  ["aircraft", "AIRCRAFT", "Typy samolotów wg producenta, kategorie turbulencji, zdjęcia."],
   ["checklist", "CHECKLIST", "Otwarcie i zamknięcie stanowiska, przekazanie, zmiana pasa."],
   ["emergency", "EMERGENCY", "ASSIST i checklisty sytuacji awaryjnych."],
 ];
@@ -56,7 +62,7 @@ export default {
       const st = await api("/api/status").catch(() => ({ counts: {} }));
       const c = st.counts;
       const row = (k, v) => `<dt>${k}</dt><dd>${v}</dd>`;
-      pane.querySelector(".info").innerHTML = row("Wersja", "0.8.0")
+      pane.querySelector(".info").innerHTML = row("Wersja", "0.9.0")
         + row("Cykl AIRAC", `${esc(ctx.config.airac.ident)} (od ${esc(ctx.config.airac.effective)})`)
         + row("Dane", `${c.aerodromes ?? "–"} lotnisk, ${c.aircraft_types ?? "–"} typów samolotów, ${c.callsigns ?? "–"} callsignów`)
         + row("Nawigacja", `${c.nav_points ?? "–"} punktów, ${c.airway_segments ?? "–"} odcinków dróg, ${c.sectors ?? "–"} sektorów, ${c.atc_positions ?? "–"} stanowisk ATC`)

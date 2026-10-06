@@ -406,7 +406,8 @@
    ],
    "ese_prefixes": [
     "EPWA_APP_",
-    "EPWA_TMA"
+    "EPWA_TMA",
+    "EPWA_DIR"
    ]
   },
   "TMA Gdańsk": {
@@ -466,7 +467,9 @@
    "ese_prefixes": [
     "EPKK_TMA",
     "EPKK_LTMA",
-    "EPKK_UTMA"
+    "EPKK_UTMA",
+    "EPKK_DEP",
+    "EPKK_DIR"
    ]
   },
   "TMA Szczecin": {

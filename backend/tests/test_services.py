@@ -246,3 +246,13 @@ def test_viff_departure_states_and_sector_load():
     assert s["occupancy"][5] == 1 and s["occupancy"][19] == 1 and s["occupancy"][20] == 0
     assert s["peak_60"] == 1 and s["hours"][0]["entries_cap"] == 30 and s["hours"][0]["peak_cap"] is None
     assert s["flights"][1]["entry"] == "0030"
+
+
+def test_runway_heading_ignores_bad_true_heading():
+    from backend.app.services.runways import runway_heading
+    assert runway_heading("33", 326.0) == 326.0
+    assert runway_heading("01", 359.0) == 359.0
+    # błąd w danych OurAirports (EPKR 16/34 z kursem 16° i 34°): kurs z numeru pasa
+    assert runway_heading("16", 16.0) == 160
+    assert runway_heading("34", 34.0) == 340
+    assert runway_heading("09ES", None) == 90
