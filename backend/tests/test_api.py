@@ -159,3 +159,15 @@ def test_viff_endpoints(client, monkeypatch):
     monkeypatch.setattr(viff, "_get", down)
     r = client.get("/api/viff/departures/EPWA")
     assert r.status_code == 502 and "vIFF" in r.json()["detail"]
+
+
+def test_vacs_sector_chains(client):
+    r = client.get("/api/nav/vacs")
+    assert r.status_code == 200
+    d = r.json()
+    assert set(d["layers"]) == {"LOW", "MID", "HIGH"}
+    assert sorted(d["sectors"]) == list("BCDEFGJNRT")
+    assert d["sectors"]["B"]["HIGH"][0] == "EPWW_N_CTR"
+    assert all(cs in d["acc_positions"] for s in d["sectors"].values() for chain in s.values() for cs in chain)
+    esmm6 = next(n for n in d["neighbours"] if n["label"] == "ESMM 6")
+    assert esmm6["alt"] == "+365" and esmm6["callsign"] == "ESMM_6_CTR"

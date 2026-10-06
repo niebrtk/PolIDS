@@ -149,6 +149,18 @@ def sectors(fir: str = "EPWW", level_ft: int | None = None, db: Session = Depend
     return {"type": "FeatureCollection", "features": feats}
 
 
+@lru_cache(maxsize=1)
+def _vacs() -> dict:
+    return json.loads((settings.seed_dir / "vacs_epww.json").read_text("utf-8"))
+
+
+@router.get("/vacs")
+def vacs():
+    """Wyciąg z vacs-data (CC BY-NC-SA 4.0): łańcuchy dziedziczenia sektorów EPWW w warstwach LOW/MID/HIGH,
+    stanowiska ACC i etykiety stanowisk sąsiadów z profilu ACC_EPWW."""
+    return _vacs()
+
+
 @router.get("/sectors/online")
 async def sectors_online(fir: str = "EPWW", db: Session = Depends(get_db)):
     """Aktualna sektoryzacja: dla każdego sektora pierwsze zalogowane stanowisko z listy OWNER."""
