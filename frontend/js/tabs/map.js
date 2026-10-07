@@ -70,7 +70,7 @@ const LEGEND = [
       albo HIGH. TMA, CTA i CTR: najpierw APP / TWR z listy OWNER pliku .ese, potem ACC (TMA: top-down z tabeli om.plvacc.pl,
       reszta: lista OWNER .ese). W dymku cała kolejność z częstotliwościami: obsługujący na zielonym tle, zalogowani na zielono,
       niezalogowani szarzy. FIS i ATZ: lista OWNER z pliku .ese. Sąsiedzi: sektory i listy OWNER z plików .ese
-      sąsiednich vACC (data/import/neighbours; sektory zależne od pasa w konfiguracji zachodniej), EKDK i UMMV z pliku EPWW.</p>`].join("")],
+      sąsiednich vACC (data/import/neighbours; sektory zależne od pasa w konfiguracji zachodniej), UMMV (Białoruś) z pliku EPWW.</p>`].join("")],
   ["traffic", "Ruch", () => [
     lg(plane("dep"), "odlot z lotniska EP**"), lg(plane("arr"), "przylot na lotnisko EP**"),
     lg(plane("trn"), "tranzyt / bez planu lotu"), lg(plane("sel"), "wybrany lot"),

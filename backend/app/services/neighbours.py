@@ -1,7 +1,7 @@
 """Sektory i stanowiska FIR-ów sąsiednich z ich własnych plików .ese (tabele nb_sectors, nb_positions).
 
 FIR-y, które mają własny plik, zastępują kopie ich sektorów z pliku EPWW (wycinki "nb" wzdłuż granicy);
-pozostali sąsiedzi (EKDK, UMMV) zostają z pliku EPWW."""
+Białoruś (UMMV) zostaje z pliku EPWW."""
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session

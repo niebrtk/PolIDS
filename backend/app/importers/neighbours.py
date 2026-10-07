@@ -22,6 +22,7 @@ NB_SOURCES = {
     "EDWW": {"firs": ["EDWW"], "vacs": "EDWW"},  # Bremen z sektorami EDYY (Maastricht) i EDUU HVL/OSE nad nim
     "EDMM": {"firs": ["EDMM"], "vacs": "EDMM"},  # München z sektorami EDUU (Rhein) nad nim
     "ESAA": {"firs": ["ESAA"], "vacs": "ES"},
+    "EKDK": {"firs": ["EKDK"], "vacs": "EK"},
     "EYVL": {"firs": ["EYVL"], "vacs": "EY"},
     "LKAA": {"firs": ["LKAA"], "vacs": "LK"},
     "LZBB": {"firs": ["LZBB"], "vacs": "LZ"},

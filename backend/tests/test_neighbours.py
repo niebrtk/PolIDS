@@ -202,10 +202,10 @@ SQUARE = json.dumps({"type": "Polygon", "coordinates": [[[14, 52], [15, 52], [15
 def test_slices_replace_epww_copies_of_covered_firs(db):
     db.execute(insert(AtcPosition), [{"callsign": "EDWW_FLG_CTR", "name": "Bremen", "frequency": "136.450",
                                       "position_id": "EDWF", "prefix": "EDWW"},
-                                     {"callsign": "EKDK_D_CTR", "name": "Copenhagen", "frequency": "136.485",
-                                      "position_id": "EKD", "prefix": "EKDK"}])
+                                     {"callsign": "UMMV_CTR", "name": "Minsk Control", "frequency": "128.350",
+                                      "position_id": "UMV", "prefix": "UMMV"}])
     db.execute(insert(Sector), [{"fir": f, "name": n, "lower_ft": 16500, "upper_ft": 28500, "owners": o, "geometry": SQUARE}
-                                for f, n, o in [("EDWW", "EDWWFLG1", "EDWF"), ("EKDK", "EKRN TMA A", "EKD")]])
+                                for f, n, o in [("EDWW", "EDWWFLG1", "EDWF"), ("UMMV", "UMMV_W", "UMV")]])
     db.execute(insert(NbSector), [{"source": "EDWW", "fir": "EDWW", "name": "EDWWFLG1", "lower_ft": 16500, "upper_ft": 28500,
                                    "owners": "EDWW_FLG_CTR:EDWW_BOR_CTR", "active": "", "geometry": SQUARE}])
     db.execute(insert(NbPosition), [{"source": "EDWW", "callsign": "EDWW_BOR_CTR", "name": "Bremen", "frequency": "123.225",
@@ -213,10 +213,10 @@ def test_slices_replace_epww_copies_of_covered_firs(db):
     db.commit()
     feats = [f["properties"] for f in slices(level_ft=20000, db=db)["features"]]
     edww = [p for p in feats if p["fir"] == "EDWW"]
-    # kopia z pliku EPWW zastąpiona sektorem z pliku sąsiada; EKDK (bez własnego pliku) zostaje z pliku EPWW
+    # kopia z pliku EPWW zastąpiona sektorem z pliku sąsiada; UMMV (bez własnego pliku) zostaje z pliku EPWW
     assert [p["source"] for p in edww] == ["EDWW"] and edww[0]["owner_callsigns"] == ["EDWW_FLG_CTR", "EDWW_BOR_CTR"]
     assert edww[0]["id"] == f"nb{1}" and edww[0]["kind"] == "nb" and edww[0]["group_label"] == "EDWW Bremen"
-    assert [p["source"] for p in feats if p["fir"] == "EKDK"] == ["EPWW"]
+    assert [p["source"] for p in feats if p["fir"] == "UMMV"] == ["EPWW"]
 
 
 @pytest.mark.skipif(not NB_DIR.is_dir(), reason="brak plików sąsiadów")
@@ -226,7 +226,7 @@ def test_real_neighbour_files():
     files = {source_key(p): p for p in NB_DIR.glob("*.ese")}
     assert set(files) == set(NB_SOURCES)
     known = {"EDWW": "EDWW_FLG_CTR", "EDMM": "EDMM_MEI_CTR", "ESAA": "ESMM_7_CTR", "EYVL": "EYVL_CTR",
-             "LKAA": "LKAA_N_CTR", "LZBB": "LZBB_CTR", "UKBV": "UKLV_CTR", "ULLL": "UMKK_CTR"}
+             "EKDK": "EKDK_C_CTR", "LKAA": "LKAA_N_CTR", "LZBB": "LZBB_CTR", "UKBV": "UKLV_CTR", "ULLL": "UMKK_CTR"}
     for key, path in files.items():
         sectors, positions = select_sectors(parse_ese(read_text(path)), key)
         assert sectors, key
