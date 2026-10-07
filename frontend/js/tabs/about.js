@@ -1,6 +1,7 @@
 import { api, esc, h } from "../api.js";
 
 const CHANGES = [
+  ["07.10.2026", "Wersja 0.9.1. MAP: poprawiony kształt sektora UKLV (Lwów) – bez fałszywego trójkąta w środku; szare nazwy FIR-ów nie zasłaniają już częstotliwości sąsiada."],
   ["06.10.2026", "Wersja 0.9.0. RADIO › GEO: kafelki stanowisk jak strony GEO w VACS (bez FMP), z częstotliwościami i tym, kto jest online; obok mapa zasięgu: kliknij jedną lub kilka pozycji (także dowolne stanowiska FIR-ów sąsiednich), żeby zobaczyć, co obsługują. Sąsiedzi: wszystkie stanowiska z pliku .ese i vacs-data, zasięgi z VATSpy."],
   ["06.10.2026", "RADIO › SEKTORYZACJA (przeniesiona z MAP): kolejność przejmowania sektorów ACC z om.plvacc.pl › ownerships zamiast VACS, lista stanowisk w jednej kolumnie, krótkie nazwy pozycji (PO N APP, EPWW DBF, EDMM MEI, WA TWR)."],
   ["06.10.2026", "TMA i CTR z pełną kolejnością przejmowania: najpierw APP i TWR z pliku .ese, potem ACC wg om.plvacc.pl. RADIO › SEKTORYZACJA: karta TMA i CTR, stanowiska APP/TWR w symulacji. MAP: dymek TMA, CTA i CTR pokazuje wszystkie stanowiska po kolei z częstotliwością i tym, kto jest online; warstwa CTA (np. CTA 02 nad TMA Warszawa) domyślnie włączona. RADIO › GEO: kafelki sąsiadów w kolorach FIR-ów jak w VACS. Komunikaty po polsku, gdy serwer vPANDORA nie odpowiada."],
@@ -62,7 +63,7 @@ export default {
       const st = await api("/api/status").catch(() => ({ counts: {} }));
       const c = st.counts;
       const row = (k, v) => `<dt>${k}</dt><dd>${v}</dd>`;
-      pane.querySelector(".info").innerHTML = row("Wersja", "0.9.0")
+      pane.querySelector(".info").innerHTML = row("Wersja", "0.9.1")
         + row("Cykl AIRAC", `${esc(ctx.config.airac.ident)} (od ${esc(ctx.config.airac.effective)})`)
         + row("Dane", `${c.aerodromes ?? "–"} lotnisk, ${c.aircraft_types ?? "–"} typów samolotów, ${c.callsigns ?? "–"} callsignów`)
         + row("Nawigacja", `${c.nav_points ?? "–"} punktów, ${c.airway_segments ?? "–"} odcinków dróg, ${c.sectors ?? "–"} sektorów, ${c.atc_positions ?? "–"} stanowisk ATC`)

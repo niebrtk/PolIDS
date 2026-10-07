@@ -1,3 +1,4 @@
+import json
 from datetime import date
 
 from backend.app.importers.ese import parse_ese, parse_vfr_points
@@ -120,6 +121,30 @@ BORDER:1:2:3
     s = data["sectors"][0]
     assert (s["fir"], s["name"], s["upper_ft"], s["owners"]) == ("EPWW", "TEST", 9500, "SWW")
     assert '"Polygon"' in s["geometry"] and s["geometry"].count("[") == 2 + 4
+
+
+def test_ese_sector_skips_zero_length_lines():
+    # UKLV_FIR: linie 861 i 862 to dwa razy ten sam punkt; doklejone na końcu rysowały trójkąt przez cały sektor
+    text = """[AIRSPACE]
+SECTORLINE:1
+COORD:N052.00.00.000:E019.00.00.000
+COORD:N052.00.00.000:E020.00.00.000
+SECTORLINE:2
+COORD:N053.00.00.000:E020.00.00.000
+COORD:N052.00.00.000:E020.00.00.000
+SECTORLINE:3
+COORD:N053.00.00.000:E020.00.00.000
+COORD:N052.00.00.000:E019.00.00.000
+SECTORLINE:9
+COORD:N051.00.00.000:E025.00.00.000
+COORD:N051.00.00.000:E025.00.00.000
+
+SECTOR:UKLV·TEST·165·660:16500:66000
+OWNER:UKLV
+BORDER:1:9:2:3:9
+"""
+    ring = json.loads(parse_ese(text)["sectors"][0]["geometry"])["coordinates"][0]
+    assert [25, 51] not in ring and len(ring) == 4 and ring[0] == ring[-1]
 
 
 def test_notam_split():

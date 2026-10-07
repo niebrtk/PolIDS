@@ -26,12 +26,15 @@ def parse_positions(lines: list[str]) -> list[dict]:
 
 
 def _chain(lines: list[list[tuple[float, float]]]) -> list[tuple[float, float]]:
-    """Łączy linie graniczne w zamknięty pierścień, odwracając je w razie potrzeby."""
-    lines = [ln for ln in lines if ln]
+    """Łączy linie graniczne w zamknięty pierścień, odwracając je w razie potrzeby.
+
+    Linie o zerowej długości (wszystkie punkty w jednym miejscu, np. 861 i 862 w UKLV_FIR) pomijamy:
+    nie wnoszą geometrii, a doklejone na końcu jako "najbliższe" przecinały cały sektor fałszywymi krawędziami."""
+    close = lambda a, b: abs(a[0] - b[0]) < 1e-4 and abs(a[1] - b[1]) < 1e-4  # noqa: E731
+    lines = [ln for ln in lines if ln and any(not close(p, ln[0]) for p in ln)]
     if not lines:
         return []
     ring = list(lines.pop(0))
-    close = lambda a, b: abs(a[0] - b[0]) < 1e-4 and abs(a[1] - b[1]) < 1e-4  # noqa: E731
     while lines:
         end = ring[-1]
         for i, ln in enumerate(lines):

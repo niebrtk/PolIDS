@@ -59,10 +59,11 @@ function atcRows(list, kind, letter) {
 
 // Osobne warstwy (panes) nad nazwami punktów, żeby plakietek nie przykrywały etykiety; dymki jeszcze wyżej.
 export function atcPanes(map) {
-  [["atcFir", 655], ["atcAd", 660], ["atcTip", 700]].forEach(([n, z]) => {
+  // atcFirName: szare nazwy FIR-ów pod etykietami przestrzeni (asLbl = 590), żeby nie zasłaniały częstotliwości sąsiada (UKLV)
+  [["atcFirName", 585], ["atcFir", 655], ["atcAd", 660], ["atcTip", 700]].forEach(([n, z]) => {
     if (!map.getPane(n)) map.createPane(n).style.zIndex = z;
   });
-  return { fir: "atcFir", ad: "atcAd", tip: "atcTip" };
+  return { firName: "atcFirName", fir: "atcFir", ad: "atcAd", tip: "atcTip" };
 }
 
 export function atcTooltip(title, subtitle, rows) {
@@ -99,7 +100,8 @@ export function drawFirs(layer, firs, onlineFirs = {}, { skip = ["EPWW"], labels
     if (!labels) return;
     const at = [f.properties.label[1], f.properties.label[0]];
     if (!on) {
-      L.marker(at, { interactive: false, icon: L.divIcon({ className: "maplabel", html: `<div><span class="firname">${esc(id)}</span></div>`, iconSize: null }) })
+      L.marker(at, { interactive: false, pane: panes.firName || "markerPane",
+        icon: L.divIcon({ className: "maplabel", html: `<div><span class="firname">${esc(id)}</span></div>`, iconSize: null }) })
         .addTo(layer);
       return;
     }
