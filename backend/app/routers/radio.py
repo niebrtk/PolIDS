@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from ..models import Aerodrome, AtcPosition, NavPoint, Sector
 from ..services.http_cache import UpstreamError
-from ..services.neighbours import covered_firs, nb_sectors, owners_of
+from ..services.neighbours import covered_firs, nb_owners, nb_sectors, owners_of
 from ..services.positions import all_positions
 from ..services.radio import Station, position_range, sector_group, sector_kind
 from ..services.vatsim import bookings_by_callsign, controller_info, fir_boundaries, match_positions, online_firs
@@ -58,7 +58,7 @@ async def online(db: Session = Depends(get_db)):
     stations = [Station(p["callsign"], p["prefix"], p["frequency"] or "") for p in merged]
     prefixes = {p["callsign"].split("_")[0] for p in merged}
     near = [c for c in ctrls if (cs := c.get("callsign", "")).split("_")[0] in prefixes or cs.startswith("EP")]
-    return {"positions": match_positions(ctrls, stations), "firs": online_firs(ctrls),
+    return {"positions": match_positions(ctrls, stations, nb_owners(db)), "firs": online_firs(ctrls),
             "controllers": [controller_info(c) for c in near if not c.get("callsign", "").endswith("_OBS")],
             "updated": data.get("general", {}).get("update_timestamp")}
 

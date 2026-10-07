@@ -190,7 +190,9 @@ vpandora/
   tylko Lwów, a polskie sektory i stanowiska zawsze są z naszego pliku. Sektory zależne od pasa (`ACTIVE`) są rysowane
   w jednym układzie na lotnisko: kierunek najbliższy przeważającemu wiatrowi z ok. 250° (np. Praga 24, Hamburg 23,
   Berlin 24L/24R), bo aplikacja nie zna pasów w użyciu u sąsiadów. Sektory bez listy OWNER (tylko do wyświetlania) pomijamy. Białoruś (UMMV)
-  nadal rysujemy z kopii w naszym pliku `.ese`.
+  nadal rysujemy z kopii w naszym pliku `.ese`. Kontroler zalogowany znakiem, którego nie ma w pliku sąsiada
+  (np. EKDK_CTR z vacs-data), obsadza sektory stanowiska z tego pliku o tym samym prefiksie, typie i częstotliwości
+  (EKDK_UN_CTR 136.555), tak jak rozpozna go EuroScope sąsiada; częstotliwości tych stanowisk są z plików sąsiadów.
 - Zasięg pozostałych stanowisk sąsiednich (bez sektora w żadnym pliku) jest przybliżony: cały sektor/FIR z VATSpy albo okrąg 30 NM (APP/DEP)
   i 10 NM (TWR), bez podziału pionowego. Mapa i legenda to zaznaczają.
 - Wiatr na podejściu (METEO › WIND, AERODROME) to prognoza modelu Open-Meteo na bieżącą godzinę UTC, interpolowana do 3000 ft AMSL
@@ -210,7 +212,7 @@ vpandora/
 - Granice FIR: [vatsimnetwork/vatspy-data-project](https://github.com/vatsimnetwork/vatspy-data-project) (CC BY-SA 4.0), plik `data/seed/vatspy_firs.geojson`.
 - Zdjęcia samolotów pobierane z Wikipedii; autor i licencja są na stronie artykułu podlinkowanej pod zdjęciem.
 - Pliki EuroScope (pakiet sektorowy PL vACC / GNG) są w `data/import/`, PDF-y w `data/docs/`. Pliki `.ese` sąsiednich vACC
-  (VATSIM Germany, Scandinavia, Denmark, Lithuania, Czech, Slovakia, Ukraine, Russia; pakiety GNG/AeroNav) są w `data/import/neighbours/`.
+  (VATSIM Germany, Scandinavia (Szwecja i Dania), Lithuania, Czech, Slovakia, Ukraine, Russia; pakiety GNG/AeroNav) są w `data/import/neighbours/`.
 - Układ widoku AWOS i mapy QNH regionalnego wzorowany na [vAWOS](https://github.com/aleksandermarcingadomski-commits/vAWOS);
   repozytorium nie ma licencji, więc nie kopiujemy kodu, a widok jest napisany od nowa.
 - Prognoza wiatru: [Open-Meteo](https://open-meteo.com) (CC BY 4.0), bez klucza, w limicie darmowego użycia niekomercyjnego.

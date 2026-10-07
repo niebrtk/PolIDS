@@ -42,11 +42,14 @@ def merge_positions(ese: list[dict], vacs_positions: list[dict], nb: list[dict] 
     fir_of = {p["id"]: p.get("fir_dir") for p in vacs_positions}
     out = {p["callsign"]: {**p, "fir": fir_of.get(p["callsign"]), "facility": facility(p["callsign"]),
                            "in_ese": True, "in_vacs": p["callsign"] in fir_of} for p in ese}
+    # częstotliwość stanowiska z kolejności przejmowania sąsiada: z jego pliku .ese, z którego są też sektory
+    # (vacs-data bywa inne: EKCH_P_APP Kastrup Final to w pliku Danii 120.205, w vacs-data 131.405)
+    nb_freq = {n["callsign"]: n.get("frequency") for n in nb if n["callsign"] in nb_listed and n.get("frequency")}
     for v in vacs_positions:
         cs = v["id"]
         if cs in out or v.get("facility_type") in ("FMP", "TMU") or facility(cs) in ("FMP", "TMU"):
             continue
-        out[cs] = {"callsign": cs, "name": None, "frequency": v.get("frequency") or "", "position_id": None,
+        out[cs] = {"callsign": cs, "name": None, "frequency": nb_freq.get(cs) or v.get("frequency") or "", "position_id": None,
                    "prefix": (v.get("prefixes") or [cs.split("_")[0]])[0], "fir": v.get("fir_dir"),
                    "facility": v.get("facility_type") or facility(cs), "in_ese": False, "in_vacs": True}
     for n in nb:

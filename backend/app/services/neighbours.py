@@ -39,3 +39,8 @@ def owners_of(s: NbSector) -> list[str]:
 def listed_callsigns(db: Session) -> set[str]:
     """Znaki stanowisk z list OWNER sektorów sąsiadów (te pozycje mają dokładny zasięg z plików sąsiadów)."""
     return {cs for s in db.scalars(select(NbSector.owners)) for cs in (s or "").split(":") if cs}
+
+
+def nb_owners(db: Session) -> set[str]:
+    """Stanowiska sąsiadów z ich list OWNER (bez EP**): do dopasowania zalogowanych jak w EuroScope sąsiada."""
+    return {cs for cs in listed_callsigns(db) if not cs.upper().startswith("EP")}

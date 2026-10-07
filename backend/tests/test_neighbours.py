@@ -260,3 +260,39 @@ def test_neighbour_file_removed_and_restored(db, tmp_path, monkeypatch):
     assert f.stat().st_mtime == st  # ten sam plik, ta sama data modyfikacji
     seed.import_neighbours(db)
     assert count() == n
+
+
+def test_match_positions_neighbour_twin():
+    """Znak z vacs-data (EKDK_CTR) bez sektorów w pliku Danii: kontroler wpisany też pod stanowiskiem z kolejności
+    przejmowania Danii o tym samym prefiksie, typie i częstotliwości (EKDK_UN_CTR), jak rozpozna go EuroScope."""
+    from backend.app.services.radio import Station
+    pos = [Station("EKDK_A_CTR", "EKDK", "128.100"), Station("EKDK_CTR", "EKDK", "136.555"),
+           Station("EKCH_F_APP", "EKCH", "120.205"), Station("EKDK_UN_CTR", "EKDK", "136.555"),
+           Station("EKCH_P_APP", "EKCH", "120.205")]
+    prefer = {"EKDK_A_CTR", "EKDK_UN_CTR", "EKCH_P_APP"}
+    on = lambda cs, f: match_positions([{"callsign": cs, "frequency": f}], pos, prefer)  # noqa: E731
+    r = on("EKDK_CTR", "136.555")
+    assert set(r) == {"EKDK_CTR", "EKDK_UN_CTR"} and r["EKDK_UN_CTR"]["alias_of"] == "EKDK_CTR"
+    assert "alias_of" not in r["EKDK_CTR"] and r["EKDK_UN_CTR"]["callsign"] == "EKDK_CTR"
+    assert set(on("EKDK_U_CTR", "136.555")) == {"EKDK_CTR", "EKDK_UN_CTR"}  # zastępczy znak: też oba
+    assert on("EKCH_F_APP", "120.205")["EKCH_P_APP"]["alias_of"] == "EKCH_F_APP"
+    assert set(on("EKDK_UN_CTR", "136.555")) == {"EKDK_UN_CTR"}  # już stanowisko sąsiada: bez kopii
+    assert set(on("EKDK_A_CTR", "128.100")) == {"EKDK_A_CTR"}
+    assert set(on("EKDK_CTR", "121.500")) == {"EKDK_CTR"}  # inna częstotliwość: brak bliźniaka
+    assert set(match_positions([{"callsign": "EKDK_CTR", "frequency": "136.555"}], pos)) == {"EKDK_CTR"}
+    # wpis pod znakiem sąsiada nie zajmuje stanowiska, na którym ktoś naprawdę siedzi (też gdy przyszedł później)
+    r = match_positions([{"callsign": "EKDK_CTR", "frequency": "136.555", "cid": 1},
+                         {"callsign": "EKDK_UN_CTR", "frequency": "136.555", "cid": 2}], pos, prefer)
+    assert r["EKDK_UN_CTR"]["cid"] == 2 and "alias_of" not in r["EKDK_UN_CTR"]
+
+
+def test_merge_positions_frequency_from_neighbour_file():
+    """Stanowisko z kolejności przejmowania sąsiada ma częstotliwość z jego pliku .ese, nie z vacs-data."""
+    from backend.app.services.radio import merge_positions
+    vacs = [{"id": "EKCH_P_APP", "frequency": "131.405", "fir_dir": "EK", "facility_type": "APP", "prefixes": ["EKCH"]},
+            {"id": "EKCH_W_APP", "frequency": "119.805", "fir_dir": "EK", "facility_type": "APP", "prefixes": ["EKCH"]}]
+    nb = [{"callsign": "EKCH_P_APP", "name": "Kastrup Final", "frequency": "120.205", "prefix": "EKCH", "source": "EKDK",
+           "fir": "EK"}]
+    by = {p["callsign"]: p for p in merge_positions([], vacs, nb, {"EKCH_P_APP"})}
+    assert by["EKCH_P_APP"]["frequency"] == "120.205" and by["EKCH_W_APP"]["frequency"] == "119.805"
+    assert {p["callsign"]: p["frequency"] for p in merge_positions([], vacs, nb)}["EKCH_P_APP"] == "131.405"

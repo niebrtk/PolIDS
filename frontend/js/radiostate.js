@@ -125,8 +125,14 @@ export function netText(count = (n) => `${n} online`) {
   if (state.ok) return `VATSIM ${hhmm(new Date(state.onlineAt).toISOString())}: ${count(onlineList().length)}`;
   return state.tried ? "VATSIM: brak danych" : "VATSIM: pobieranie…";
 }
+// stanowiska, pod którymi zalogowany kontroler jest też wpisany znakiem z pliku sąsiada (EKDK_CTR → EKDK_UN_CTR,
+// pole alias_of z /api/radio/online): liczymy go raz, pod znakiem z pliku sąsiada, bo ten ma dokładne sektory
+export const aliased = () => new Set(Object.values(state.online).map((o) => o?.alias_of).filter(Boolean));
 // zalogowani w sieci, bez ATIS (to nie jest stanowisko kontroli)
-export const onlineList = () => Object.keys(state.online).filter((cs) => typeOf(cs) !== "ATIS");
+export const onlineList = () => {
+  const al = aliased();
+  return Object.keys(state.online).filter((cs) => typeOf(cs) !== "ATIS" && !al.has(cs));
+};
 export const activeSet = () => new Set(state.mode === "sim" ? state.sim : onlineList());
 
 // kolejność wyświetlania: EPWW i Polska, potem sąsiedzi; w obrębie: CTR/FSS, APP, TWR, GND, DEL
