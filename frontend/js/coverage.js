@@ -56,10 +56,11 @@ export function accSummary(active, own) {
 }
 export const accText = (m) => Object.entries(m || {}).map(([s, ls]) => `${s} ${ls}`).join(", ");
 
-// Punkt etykiety wewnątrz wielokąta, możliwie daleko od krawędzi (uproszczony polylabel: siatka próbek)
+// Punkt etykiety wewnątrz wielokąta, możliwie daleko od krawędzi (uproszczony polylabel: siatka próbek).
+// within: [lonMin, latMin, lonMax, latMax] – szukaj tylko w tej ramce (np. część sektora sąsiada blisko Polski).
 const labelCache = new Map();
-export function labelPoint(f) {
-  const key = `${f.properties.fir || ""}/${f.properties.name}/${f.properties.lower_ft}`;
+export function labelPoint(f, within = null) {
+  const key = `${f.properties.fir || ""}/${f.properties.name}/${f.properties.lower_ft}/${within || ""}`;
   if (labelCache.has(key)) return labelCache.get(key);
   const g = f.geometry;
   const polys = g.type === "Polygon" ? [g.coordinates] : g.type === "MultiPolygon" ? g.coordinates : [];
@@ -69,7 +70,11 @@ export function labelPoint(f) {
     const k = Math.cos((ring[0][1] * Math.PI) / 180);  // długość geogr. → te same jednostki co szerokość
     const pts = ring.map(([x, y]) => [x * k, y]);
     const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]);
-    const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+    let x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+    if (within) {
+      [x0, x1, y0, y1] = [Math.max(x0, within[0] * k), Math.min(x1, within[2] * k), Math.max(y0, within[1]), Math.min(y1, within[3])];
+      if (x0 >= x1 || y0 >= y1) return;
+    }
     const N = 22;
     for (let i = 0; i < N; i++) {
       for (let j = 0; j < N; j++) {

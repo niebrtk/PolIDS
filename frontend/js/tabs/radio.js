@@ -107,7 +107,8 @@ function pidHtml(p) {
       ...v.keys.map((k) => `${k.label}${k.alt ? " " + k.alt : ""}`)].join("\n");
     return `<span class="pid vacs"><span title="${esc(tip)}">${esc(v.label)}</span>${v.alt ? `<b class="alt" title="${esc(altTip(v.alt))}">${esc(v.alt)}</b>` : ""}</span>`;
   }
-  return `<span class="pid" title="${esc(p.position_id ? `ID w pliku .ese: ${p.position_id}` : "stanowisko spoza pliku .ese (vacs-data)")}">${esc(displayName(p.callsign))}</span>`;
+  const src = p.position_id ? `ID w pliku .ese: ${p.position_id}` : p.nb_source ? `stanowisko z pliku .ese sąsiada (${p.nb_source})` : "stanowisko spoza pliku .ese (vacs-data)";
+  return `<span class="pid" title="${esc(src)}">${esc(displayName(p.callsign))}</span>`;
 }
 const pidLen = (p) => (vacs?.pos[p.callsign] ? vacs.pos[p.callsign].label.length + 5 : displayName(p.callsign).length);
 

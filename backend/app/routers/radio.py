@@ -1,34 +1,20 @@
 import json
-from functools import lru_cache
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from ..config import settings
 from ..database import get_db
 from ..models import Aerodrome, AtcPosition, NavPoint, Sector
 from ..services.http_cache import UpstreamError
-from ..services.radio import Station, merge_positions, position_range, sector_group, sector_kind
+from ..services.neighbours import covered_firs, nb_sectors, owners_of
+from ..services.positions import all_positions
+from ..services.radio import Station, position_range, sector_group, sector_kind
 from ..services.vatsim import bookings_by_callsign, controller_info, fir_boundaries, match_positions, online_firs
 # data feed i rezerwacje przez moduł /api/vatsim: jeden cache i jedno miejsce podmiany (testy, serwer demo)
 from . import vatsim as vatsim_api
 
 router = APIRouter(prefix="/api/radio", tags=["radio"])
-
-
-@lru_cache(maxsize=1)
-def _vacs_positions() -> list[dict]:
-    try:
-        return json.loads((settings.seed_dir / "vacs_epww.json").read_text("utf-8")).get("neighbour_positions", [])
-    except (OSError, ValueError):
-        return []
-
-
-def _merged(db: Session) -> list[dict]:
-    ese = [{"callsign": p.callsign, "name": p.name, "frequency": p.frequency, "position_id": p.position_id,
-            "prefix": p.prefix} for p in db.scalars(select(AtcPosition))]
-    return merge_positions(ese, _vacs_positions())
 
 
 def _coords(db: Session, icaos: set[str]) -> dict[str, tuple[float, float]]:
@@ -45,7 +31,7 @@ def positions(db: Session = Depends(get_db)):
 
     `in_ese=false`: stanowisko tylko z vacs-data (bez nazwy, pokazujemy `fir_name`). `range`: zasięg na mapie
     (granica VATSpy, okrąg wokół lotniska albo punkt lotniska)."""
-    merged = _merged(db)
+    merged = all_positions(db)
     coords = _coords(db, {p["callsign"].split("_")[0] for p in merged})
     firs = fir_boundaries()
     for p in merged:
@@ -68,7 +54,7 @@ async def online(db: Session = Depends(get_db)):
     znanych stanowisk (także ci, których nie udało się dopasować)."""
     data = await _feed()
     ctrls = data.get("controllers", []) + data.get("atis", [])
-    merged = _merged(db)
+    merged = all_positions(db)
     stations = [Station(p["callsign"], p["prefix"], p["frequency"] or "") for p in merged]
     prefixes = {p["callsign"].split("_")[0] for p in merged}
     near = [c for c in ctrls if (cs := c.get("callsign", "")).split("_")[0] in prefixes or cs.startswith("EP")]
@@ -84,7 +70,7 @@ async def bookings(db: Session = Depends(get_db)):
         data = await vatsim_api.get_bookings()
     except (UpstreamError, ValueError) as exc:
         raise HTTPException(502, f"VATSIM ATC bookings niedostępne: {exc}") from exc
-    known = {p["callsign"] for p in _merged(db)}
+    known = {p["callsign"] for p in all_positions(db)}
     result = {cs: b for cs, b in bookings_by_callsign(data).items() if cs in known or cs.startswith("EP")}
     try:
         feed = await vatsim_api.get_feed()
@@ -102,15 +88,23 @@ def sectors(db: Session = Depends(get_db)):
     """Wszystkie wycinki sektorów z pliku .ese (EPWW i sąsiedzi) do mapy zasięgu: rodzaj (acc/tma/ctr/fis/nb),
     nazwa zbiorcza i lista OWNER przełożona na znaki stanowisk (kolejność przejmowania)."""
     by_id = {p.position_id: p.callsign for p in db.scalars(select(AtcPosition))}
+    covered = covered_firs(db)
     feats = []
     for s in db.scalars(select(Sector).order_by(Sector.id)):
         kind = sector_kind(s.fir, s.name)
-        if not kind or s.lower_ft >= 66000:
+        if not kind or s.lower_ft >= 66000 or (kind == "nb" and s.fir.upper() in covered):
             continue
         ids = [o for o in s.owners.split(":") if o]
         feats.append({"type": "Feature", "geometry": json.loads(s.geometry), "properties": {
             "fir": s.fir, "name": s.name, "kind": kind, "group": sector_group(s.fir, s.name, kind),
             "lower_ft": s.lower_ft, "upper_ft": s.upper_ft, "owners": [by_id[o] for o in ids if o in by_id],
-            "owner_ids": ids}})
+            "owner_ids": ids, "source": "EPWW"}})
+    # sąsiedzi z ich własnych plików .ese (bez wycinków technicznych i powyżej FL660 – pominięte przy imporcie)
+    for s in nb_sectors(db):
+        fir = s.fir.upper()
+        feats.append({"type": "Feature", "geometry": json.loads(s.geometry), "properties": {
+            "fir": fir, "name": s.name, "kind": "nb", "group": sector_group(fir, s.name, "nb"),
+            "lower_ft": s.lower_ft, "upper_ft": s.upper_ft, "owners": owners_of(s), "owner_ids": [],
+            "source": s.source}})
     return {"type": "FeatureCollection", "features": feats,
             "note": None if feats else "Brak sektorów: zaimportuj plik .ese (data/import)."}

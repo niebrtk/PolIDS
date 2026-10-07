@@ -18,7 +18,7 @@ i bez poświaty pod napisami. Po uruchomieniu aplikacja zawsze otwiera stronę s
 | **AD CIV / AD MIL / AD VFR** | eAIP PAŻP | iframe + „otwórz w nowej karcie” |
 | **CALLSIGN** | baza callsignów, podmenu A–Z, oznaczenie CARGO / MILITARY | `ICAO_Airlines.txt`, `GRpluginOperatorInfo.txt` |
 | **AIRCRAFT** | typy: WTC, RECAT-EU, wymiary, MTOW, zdjęcie, link do EUROCONTROL Aircraft Performance Database, podmenu A–Z, przyciski producentów **AIRBUS, BOEING, EMBRAER, MCDONNELL, ATR, CESSNA** (MCDONNELL obejmuje też Douglas DC-3…DC-9, AIRBUS także śmigłowce Airbus Helicopters) | aircraft-database.com + `ICAO_Aircraft.json`, zdjęcia w `data/photos/` (brakujące pobierane raz z Wikipedii) |
-| **MAP** | **Przestrzeń na wybranym poziomie**: pole FL z szybkimi przyciskami (015…370) albo „wszystkie poziomy”; rysowane są tylko wycinki, których granice pionowe z `.ese` obejmują ten poziom (np. TMA Warszawa kończy się na FL225, wyżej do FL245 jest CTA 02 obsługiwane przez WA APP). Warstwy ACC EPWW, TMA, **CTA** (domyślnie włączona), CTR, FIS/ATZ/TRA i **sąsiednie FIR** z **listami do wyboru pojedynczych sektorów**, obsada wg kontrolerów online (kolejność przejmowania ACC wg om.plvacc.pl, TMA/CTA/CTR: APP i TWR z `.ese`, potem ACC wg om.plvacc.pl), **opis wszystkich przestrzeni pod kursorem** (ACC, TMA, CTR: nazwa, granice pionowe, częstotliwość, kto obsługuje; przy TMA, CTA i CTR wszystkie stanowiska po kolei z tym, kto jest online). Samoloty z VATSIM jako sylwetki w kolorach **odlot z FIR EPWW / przylot / tranzyt (biały)**, kliknięcie = szczegóły lotu jak w NM UI (pozycja, czasy vIFF, regulacja, trasa, wejścia w sektory). Plakietki kontrolerów jak w VATSIM Radar (D/G/T/A/APP przy lotnisku, CTR przy FIR), karta lotniska po najechaniu (METAR, kto jest online, **ATIS z nazwiskiem kontrolera**, bez UNICOM). Przepustowość sektorów z vIFF (aktywne scenariusze, lista TV, wykres i tabela lotów). Trasa z planu lotu, symbole EuroScope, podkład ciemny, jasny, biały albo OSM | `.sct`, `.ese`, `airway.txt`, `isec.txt`, `data/seed/ownership.json`, VATSIM, VATSpy, vIFF |
+| **MAP** | **Przestrzeń na wybranym poziomie**: pole FL z szybkimi przyciskami (015…370) albo „wszystkie poziomy”; rysowane są tylko wycinki, których granice pionowe z `.ese` obejmują ten poziom (np. TMA Warszawa kończy się na FL225, wyżej do FL245 jest CTA 02 obsługiwane przez WA APP). Warstwy ACC EPWW, TMA, **CTA** (domyślnie włączona), CTR, FIS/ATZ/TRA i **sąsiednie FIR** (sektory Niemiec, Szwecji, Litwy, Czech, Słowacji, Lwowa i Kaliningradu z plików `.ese` tych vACC, na wybranym poziomie, w kolorze obsady wg ich list OWNER) z **listami do wyboru pojedynczych sektorów**, obsada wg kontrolerów online (kolejność przejmowania ACC wg om.plvacc.pl, TMA/CTA/CTR: APP i TWR z `.ese`, potem ACC wg om.plvacc.pl), **opis wszystkich przestrzeni pod kursorem** (ACC, TMA, CTR: nazwa, granice pionowe, częstotliwość, kto obsługuje; przy TMA, CTA i CTR wszystkie stanowiska po kolei z tym, kto jest online). Samoloty z VATSIM jako sylwetki w kolorach **odlot z FIR EPWW / przylot / tranzyt (biały)**, kliknięcie = szczegóły lotu jak w NM UI (pozycja, czasy vIFF, regulacja, trasa, wejścia w sektory). Plakietki kontrolerów jak w VATSIM Radar (D/G/T/A/APP przy lotnisku, CTR przy FIR), karta lotniska po najechaniu (METAR, kto jest online, **ATIS z nazwiskiem kontrolera**, bez UNICOM). Przepustowość sektorów z vIFF (aktywne scenariusze, lista TV, wykres i tabela lotów). Trasa z planu lotu, symbole EuroScope, podkład ciemny, jasny, biały albo OSM | `.sct`, `.ese`, `airway.txt`, `isec.txt`, `data/seed/ownership.json`, VATSIM, VATSpy, vIFF |
 | **INOP** | om.plvacc.pl | iframe |
 | **DOCS** | PDF-y z folderu `data/docs/` otwierane w aplikacji | `data/docs/` |
 | **PHRASEOLOGY** | „Say Again? The Phraseology Database” z EUROCONTROL Learning Zone (link pełnoekranowy) w ramce; nad nią przycisk „otwórz w nowej karcie” i uwaga, gdy serwis blokuje ramki (X-Frame-Options SAMEORIGIN) | `VPANDORA_PHRASEOLOGY_URL` |
@@ -184,9 +184,14 @@ vpandora/
   wzięte z pliku `.ese` (tabela om jest tam sprzeczna z opisami stanowisk). TMA, CTA i CTR: najpierw APP/TWR z listy OWNER `.ese`, potem ACC (dla TMA z tabeli om „top-down”, np. TMA Poznań N: …DBF, ALL, N, ALH,
   inaczej niż w `.ese`); FIS i sąsiedzi: listy OWNER z `.ese`. EPWA_F_APP (WA DIR) przejmuje tylko wycinki EPWA_DIR*, bo tak stoi w `.ese`.
   Presetów z plvacc.pl/acc-sectors nie ma. Granice sektorów i ich granice pionowe są z `.ese` (eAIP PAŻP nie był porównywany).
-- Zasięg stanowisk sąsiednich bez wycinków w `.ese` jest przybliżony: cały sektor/FIR z VATSpy albo okrąg 30 NM (APP/DEP)
-  i 10 NM (TWR), bez podziału pionowego. Mapa i legenda to zaznaczają. EDUU (Rhein) i EDYY (Maastricht) nie mają granic w VATSpy,
-  więc ich stanowiska bez wycinków w `.ese` pokazują całe FIR-y pod spodem (EDGG+EDMM, EDWW); ESCR/ESDK/ESPF cały ESAA.
+- Sektory sąsiadów (EDWW z EDYY/EDUU nad nim, EDMM, ESAA, EYVL, LKAA, LZBB, UKLV, UMKK) pochodzą z ich własnych plików `.ese`
+  w `data/import/neighbours/` (tylko rejon wokół Polski, bez sektorów technicznych i powyżej FL660). Z każdego pliku bierzemy
+  wyłącznie FIR-y, które ten pakiet utrzymuje: pakiet ukraiński (AIRAC 2512) ma stare polskie sektory, więc bierzemy z niego
+  tylko Lwów, a polskie sektory i stanowiska zawsze są z naszego pliku. Sektory zależne od pasa (`ACTIVE`) są rysowane
+  w konfiguracji zachodniej/północnej (pasy 19–36), bo aplikacja nie zna pasów w użyciu u sąsiadów. Danię (EKDK) i Białoruś (UMMV)
+  nadal rysujemy z kopii w naszym pliku `.ese`.
+- Zasięg pozostałych stanowisk sąsiednich (bez sektora w żadnym pliku) jest przybliżony: cały sektor/FIR z VATSpy albo okrąg 30 NM (APP/DEP)
+  i 10 NM (TWR), bez podziału pionowego. Mapa i legenda to zaznaczają.
 - Wiatr na podejściu (METEO › WIND, AERODROME) to prognoza modelu Open-Meteo na bieżącą godzinę UTC, interpolowana do 3000 ft AMSL
   z poziomów 1000–850 hPa; Windy pokazuje model ECMWF, więc wartości mogą się różnić. Punkt FAF/IAF jest brany z procedur w `.ese`;
   dla pasów bez takiej procedury to punkt na przedłużeniu osi.
@@ -203,7 +208,8 @@ vpandora/
 - Dane ATFCM/CDM (CTOT, status lotu, A-CDM, przepustowość sektorów): [vIFF](https://viffsys.com) (Roger Puig), tylko odczyt.
 - Granice FIR: [vatsimnetwork/vatspy-data-project](https://github.com/vatsimnetwork/vatspy-data-project) (CC BY-SA 4.0), plik `data/seed/vatspy_firs.geojson`.
 - Zdjęcia samolotów pobierane z Wikipedii; autor i licencja są na stronie artykułu podlinkowanej pod zdjęciem.
-- Pliki EuroScope (pakiet sektorowy PL vACC / GNG) są w `data/import/`, PDF-y w `data/docs/`.
+- Pliki EuroScope (pakiet sektorowy PL vACC / GNG) są w `data/import/`, PDF-y w `data/docs/`. Pliki `.ese` sąsiednich vACC
+  (VATSIM Germany, Scandinavia, Lithuania, Czech, Slovakia, Ukraine, Russia; pakiety GNG/AeroNav) są w `data/import/neighbours/`.
 - Układ widoku AWOS i mapy QNH regionalnego wzorowany na [vAWOS](https://github.com/aleksandermarcingadomski-commits/vAWOS);
   repozytorium nie ma licencji, więc nie kopiujemy kodu, a widok jest napisany od nowa.
 - Prognoza wiatru: [Open-Meteo](https://open-meteo.com) (CC BY 4.0), bez klucza, w limicie darmowego użycia niekomercyjnego.

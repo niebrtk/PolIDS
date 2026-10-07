@@ -12,6 +12,7 @@ from ..importers.ese import parse_vfr_points
 from ..importers.sct import parse_line_groups, read_text, sections
 from ..models import AirwaySegment, AtcPosition, NavPoint, Sector
 from ..services.http_cache import UpstreamError
+from ..services.neighbours import covered_firs, nb_positions, nb_sectors, owners_of
 from ..services.route import RouteResolver
 from ..services.vatsim import get_feed, match_positions
 
@@ -289,12 +290,15 @@ def slices(level_ft: int | None = None, db: Session = Depends(get_db)):
     if level_ft is not None:
         stmt = stmt.where(Sector.lower_ft <= level_ft, Sector.upper_ft > level_ft)
     pos = _positions(db)
+    covered = covered_firs(db)
     feats = []
     for s in db.scalars(stmt):
         kg = slice_kind(s.fir, s.name)
         if not kg:
             continue
         kind, group = kg
+        if kind == "nb" and group in covered:  # FIR z własnym plikiem .ese: jego sektory niżej
+            continue
         owners = [o for o in s.owners.split(":") if o]
         first = pos.get(owners[0]) if owners else None
         feats.append({"type": "Feature", "geometry": json.loads(s.geometry), "properties": {
@@ -303,6 +307,20 @@ def slices(level_ft: int | None = None, db: Session = Depends(get_db)):
             "lower_ft": s.lower_ft, "upper_ft": s.upper_ft,
             "owners": owners, "owner_callsigns": [pos[o].callsign for o in owners if o in pos],
             "callsign": first.callsign if first else None, "frequency": first.frequency if first else None,
+            "source": "EPWW", "active": [],
+        }})
+    # sąsiedzi z ich własnych plików .ese: owners to już znaki stanowisk (ID są ważne tylko w obrębie jednego pliku)
+    freq = {p["callsign"]: p["frequency"] for p in nb_positions(db)}
+    for s in nb_sectors(db, level_ft):
+        fir = s.fir.upper()
+        owners = owners_of(s)
+        first = owners[0] if owners else None
+        feats.append({"type": "Feature", "geometry": json.loads(s.geometry), "properties": {
+            "id": f"nb{s.id}", "fir": fir, "name": s.name, "label": slice_label(fir, s.name), "kind": "nb",
+            "group": fir, "group_label": group_label("nb", fir, s.name),
+            "lower_ft": s.lower_ft, "upper_ft": s.upper_ft, "owners": owners, "owner_callsigns": owners,
+            "callsign": first, "frequency": freq.get(first) if first else None,
+            "source": s.source, "active": (s.active or "").split(),
         }})
     note = None if feats or level_ft is not None else "Brak sektorów: zaimportuj plik .ese (data/import)."
     return {"type": "FeatureCollection", "features": feats, "limits_source": "ese", "note": note}

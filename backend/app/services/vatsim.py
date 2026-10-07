@@ -60,17 +60,22 @@ def match_positions(controllers: list[dict], positions: list) -> dict[str, dict]
 
     Najpierw dokładny callsign, potem jak w EuroScope: prefiks, typ (końcówka) i częstotliwość."""
     by_cs = {p.callsign: p for p in positions}
+    # indeks (prefiks, typ) → stanowiska w kolejności listy: pierwsze pasujące wygrywa, jak przy przeglądaniu całej listy
+    by_key: dict[tuple[str, str], list[tuple[int, object]]] = {}
+    for i, p in enumerate(positions):
+        if p.prefix:
+            by_key.setdefault((p.prefix, p.callsign.split("_")[-1]), []).append((i, p))
     online: dict[str, dict] = {}
     for c in controllers:
         cs, freq = c.get("callsign", ""), c.get("frequency", "")
         if cs in by_cs:
             online[cs] = controller_info(c)
             continue
-        for p in positions:
-            if (p.prefix and cs.startswith(p.prefix + "_") and cs.split("_")[-1] == p.callsign.split("_")[-1]
-                    and freq[:7] == p.frequency[:7]):
-                online.setdefault(p.callsign, controller_info(c))
-                break
+        parts = cs.split("_")
+        cands = [ip for n in range(1, len(parts)) for ip in by_key.get(("_".join(parts[:n]), parts[-1]), ())
+                 if freq[:7] == (ip[1].frequency or "")[:7]]
+        if cands:
+            online.setdefault(min(cands, key=lambda ip: ip[0])[1].callsign, controller_info(c))
     return online
 
 

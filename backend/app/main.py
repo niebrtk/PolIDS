@@ -18,7 +18,7 @@ async def lifespan(_app: FastAPI):
     yield
 
 
-app = FastAPI(title="vPANDORA API", version="0.9.1", lifespan=lifespan,
+app = FastAPI(title="vPANDORA API", version="0.10.0", lifespan=lifespan,
               description="API dla aplikacji vPANDORA (VATSIM PL vACC). Dokumentacja interaktywna: /docs")
 
 for r in (system, meteo, aerodromes, notam, aircraft, callsigns, nav, radio, vatsim, viff, docs):

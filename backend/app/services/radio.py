@@ -12,7 +12,7 @@ GROUND = ("GND", "DEL", "RMP", "ATIS")
 FIR_NAMES = {"EDWW": "FIR Bremen", "EDMM": "FIR München", "EDUU": "UIR Rhein", "LK": "FIR Praha", "LZ": "FIR Bratislava",
              "ES": "FIR Sverige", "EY": "FIR Vilnius", "EK": "FIR København", "UMKK": "FIR Kaliningrad"}
 # prefiksy, które w katalogu FIR-u vacs-data są innym organem (EDYY = Maastricht UAC nad FIR Bremen)
-PREFIX_NAMES = {"EDYY": "UAC Maastricht", "EDUU": "UIR Rhein"}
+PREFIX_NAMES = {"EDYY": "UAC Maastricht", "EDUU": "UIR Rhein", "EDGG": "FIR Langen"}
 # prefiksy bez własnej granicy w VATSpy: FIR-y, nad którymi leży stanowisko (UIR Rhein nad Langen i München,
 # Maastricht UAC nad Bremen, szwedzkie ESCR/ESDK/ESPF – cała Szwecja)
 NB_ALIAS = {"EDUU": ["EDGG", "EDMM"], "EDYY": ["EDWW"], "ESCR": ["ESAA"], "ESDK": ["ESAA"], "ESPF": ["ESAA"]}
@@ -31,10 +31,14 @@ def facility(callsign: str) -> str:
     return parts[-1] if len(parts) > 1 and parts[-1] in TYPES else ""
 
 
-def merge_positions(ese: list[dict], vacs_positions: list[dict]) -> list[dict]:
-    """Stanowiska z pliku .ese uzupełnione o stanowiska sąsiadów z vacs-data (klucz: znak wywoławczy).
+def merge_positions(ese: list[dict], vacs_positions: list[dict], nb: list[dict] = (),
+                    nb_listed: set[str] = frozenset()) -> list[dict]:
+    """Stanowiska z pliku .ese uzupełnione o stanowiska sąsiadów z vacs-data i z plików .ese sąsiadów
+    (klucz: znak wywoławczy; pierwszeństwo: plik EPWW, vacs-data, pliki sąsiadów).
 
-    Pozycje tylko z vacs-data nie mają nazwy ani ID z pliku .ese; FMP/TMU pomijamy (to nie są stanowiska ATC)."""
+    Pozycje tylko z vacs-data nie mają nazwy ani ID z pliku .ese; FMP/TMU pomijamy (to nie są stanowiska ATC).
+    nb: stanowiska z kolejności przejmowania sektorów sąsiadów ({callsign, name, frequency, prefix, source, fir});
+    nb_listed: znaki z tych kolejności – `nb_ese` = zasięg z dokładnych sektorów sąsiada zamiast VATSpy."""
     fir_of = {p["id"]: p.get("fir_dir") for p in vacs_positions}
     out = {p["callsign"]: {**p, "fir": fir_of.get(p["callsign"]), "facility": facility(p["callsign"]),
                            "in_ese": True, "in_vacs": p["callsign"] in fir_of} for p in ese}
@@ -45,7 +49,15 @@ def merge_positions(ese: list[dict], vacs_positions: list[dict]) -> list[dict]:
         out[cs] = {"callsign": cs, "name": None, "frequency": v.get("frequency") or "", "position_id": None,
                    "prefix": (v.get("prefixes") or [cs.split("_")[0]])[0], "fir": v.get("fir_dir"),
                    "facility": v.get("facility_type") or facility(cs), "in_ese": False, "in_vacs": True}
+    for n in nb:
+        cs = n["callsign"]
+        if cs in out or cs.upper().startswith("EP") or facility(cs) in ("FMP", "TMU"):
+            continue
+        out[cs] = {"callsign": cs, "name": n.get("name"), "frequency": n.get("frequency") or "", "position_id": None,
+                   "prefix": n.get("prefix") or cs.split("_")[0], "fir": n.get("fir"), "facility": facility(cs),
+                   "in_ese": False, "in_vacs": False, "nb_source": n.get("source")}
     for p in out.values():
+        p["nb_ese"] = p["callsign"] in nb_listed
         p["fir_name"] = PREFIX_NAMES.get(p.get("prefix") or "") or FIR_NAMES.get(p["fir"] or "")
     return sorted(out.values(), key=lambda p: p["callsign"])
 

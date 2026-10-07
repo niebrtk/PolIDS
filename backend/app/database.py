@@ -5,8 +5,8 @@ from .config import settings
 
 
 # Podnieś przy każdej zmianie tabel (albo sposobu importu danych): stara baza zostanie zbudowana od nowa z plików w repo.
-# 3: poprawione sklejanie granic sektorów .ese (linie o zerowej długości).
-SCHEMA_VERSION = 3
+# 3: poprawione sklejanie granic sektorów .ese (linie o zerowej długości). 4: sektory sąsiadów z ich plików .ese.
+SCHEMA_VERSION = 4
 
 
 class Base(DeclarativeBase):

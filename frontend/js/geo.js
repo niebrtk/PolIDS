@@ -1,7 +1,7 @@
 // RADIO › GEO: strony GEO jak w VACS (kafelki stanowisk z profilu ACC_EPWW, vacs-data CC BY-NC-SA 4.0; bez FMP)
 // z częstotliwościami i stanem sieci, obok mapa zasięgu. Kliknięcie kafelka włącza/wyłącza pozycję w symulacji
-// (kilka naraz). Mapa: wycinki sektorów z pliku .ese, które przejmuje każda aktywna pozycja (coverage.js), sąsiedzi
-// bez wycinków – granica z VATSpy albo przybliżony okrąg wokół lotniska. Kafelek sektora ACC ("B H") pokazuje,
+// (kilka naraz). Mapa: wycinki sektorów z pliku .ese (sąsiedzi: z plików .ese ich vACC), które przejmuje każda
+// aktywna pozycja (coverage.js); bez wycinków – granica z VATSpy albo przybliżony okrąg wokół lotniska. Kafelek sektora ACC ("B H") pokazuje,
 // kto teraz ma ten sektor w tej warstwie (kolejność z /api/nav/ownership), a kliknięty – zaznacza go na mapie.
 import { BASEMAPS, LIGHT_BASEMAPS, esc, h, hhmm, lsGet, lsSet } from "./api.js";
 import { VACS_LAYERS, drawFirs, loadFirs, loadVacs } from "./airspace.js";
@@ -16,7 +16,7 @@ const PAGE_TITLES = { "ACC / KRAJ": "ACC KRAJ", "TWR / KRAJ": "TWR KRAJ", "APP /
 // strona bez kluczy (albo spoza listy) liczy się jak FMP: pomijana
 const fmpPage = (p) => !p?.keys?.length || p.keys.every((k) => !k || k.fmp);
 const KINDS = [["acc", "ACC", "sektory ACC EPWW"], ["tma", "TMA", "TMA, APP i CTA"], ["ctr", "CTR", "strefy CTR lotnisk"],
-  ["fis", "FIS", "FIS, ATZ i TRA"], ["nb", "SĄSIEDZI", "wycinki sąsiednich FIR-ów z pliku .ese"]];
+  ["fis", "FIS", "FIS, ATZ i TRA"], ["nb", "SĄSIEDZI", "sektory sąsiednich FIR-ów z plików .ese ich vACC"]];
 const KIND_Z = { nb: 0, acc: 1, fis: 2, tma: 3, ctr: 4 };
 const KIND_ORDER = ["tma", "ctr", "fis", "nb"];
 const LS = "radio.geo.";
@@ -189,6 +189,8 @@ export function geoView(ctx) {
     const r = P(cs)?.range;
     if (!r || r.kind === "point") return r || null;
     if (cs.startsWith("EP")) return owned.has(cs) || listed().has(cs) ? null : r;
+    // sąsiad z dokładnymi sektorami z pliku .ese swojego vACC: jak stanowiska EP (bez obrysu VATSpy na wycinkach)
+    if (P(cs)?.nb_ese) return owned.has(cs) || listed().has(cs) ? null : r;
     if (r.kind === "vatspy" && r.exact) return r;
     return owned.has(cs) ? null : r;
   };

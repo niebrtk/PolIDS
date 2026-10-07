@@ -3,6 +3,7 @@ import { chartHtml, delayClass, listRow, loadRatio, stateChip, tvGroup, tvLabel 
 import { FACILITIES, PLANE_PATH, SymbolMarker, aircraftMarker, airportBadge, altLabel, atcPanes, colorFor, drawFirs, fl, loadFirs, loadVacs, sliceOwner,
   symbolFor, symbolSvg, vacsLayer } from "../airspace.js";
 import { airspaceChain } from "../chains.js";
+import { labelPoint } from "../coverage.js";
 import { displayName, loadDisplayNames } from "../posname.js";
 
 // Kolory zależne od podkładu (ciemny / jasny)
@@ -68,7 +69,8 @@ const LEGEND = [
       Sektor ACC: pierwsze stanowisko online z kolejności przejmowania (<span class="own-src">…</span>) w warstwie LOW (do FL335), MID (do FL365)
       albo HIGH. TMA, CTA i CTR: najpierw APP / TWR z listy OWNER pliku .ese, potem ACC (TMA: top-down z tabeli om.plvacc.pl,
       reszta: lista OWNER .ese). W dymku cała kolejność z częstotliwościami: obsługujący na zielonym tle, zalogowani na zielono,
-      niezalogowani szarzy. FIS, ATZ i sąsiedzi: lista OWNER z pliku .ese.</p>`].join("")],
+      niezalogowani szarzy. FIS i ATZ: lista OWNER z pliku .ese. Sąsiedzi: sektory i listy OWNER z plików .ese
+      sąsiednich vACC (data/import/neighbours; sektory zależne od pasa w konfiguracji zachodniej), EKDK i UMMV z pliku EPWW.</p>`].join("")],
   ["traffic", "Ruch", () => [
     lg(plane("dep"), "odlot z lotniska EP**"), lg(plane("arr"), "przylot na lotnisko EP**"),
     lg(plane("trn"), "tranzyt / bez planu lotu"), lg(plane("sel"), "wybrany lot"),
@@ -434,6 +436,11 @@ function mainMap(ctx) {
       const acc = ch.acc.find(on);
       return { c: null, top: acc ? on(acc) : null, key: null, who: acc || null, ch };
     }
+    // sąsiedzi: pierwsze zalogowane stanowisko z listy OWNER (znaki; z plików .ese sąsiadów albo z pliku EPWW)
+    if (pr.kind === "nb") {
+      const nb = (pr.owner_callsigns || []).find((x) => onl[x]);
+      return { c: nb ? onl[nb] : null, top: null, key: nb || null };
+    }
     const o = sliceOwner(pr, byId, onl, vacs);
     const cs = o.c?.callsign || "";
     if (pr.kind === "atz" && !pr.group.startsWith("EPTR") && o.c && !cs.startsWith(pr.group + "_")) return { c: null, top: o.c, key: null };
@@ -495,6 +502,9 @@ function mainMap(ctx) {
   map.on("zoomend", declutter);
   const area = (bb) => (bb[2] - bb[0]) * (bb[3] - bb[1]);
   const center = (f) => L.latLngBounds([f.bb[1], f.bb[0]], [f.bb[3], f.bb[2]]).getCenter();
+  // sąsiedzi: etykieta stanowiska na wycinku z największą częścią w pobliżu Polski (sektory ESMM sięgają daleko na północ)
+  const NEAR = [13, 48.5, 25.5, 56];
+  const nearArea = (bb) => Math.max(0, Math.min(bb[2], NEAR[2]) - Math.max(bb[0], NEAR[0])) * Math.max(0, Math.min(bb[3], NEAR[3]) - Math.max(bb[1], NEAR[1]));
   function drawAirspace() {
     layers.air.clearLayers();
     layers.airLbl.clearLayers();
@@ -532,7 +542,8 @@ function mainMap(ctx) {
       const k = pr.kind === "acc" ? "acc:" + pr.name : (pr.kind === "tma" || pr.kind === "cta") && c ? "app:" + c.callsign
         : pr.kind === "nb" && c ? `nb:${pr.group}:${c.callsign}` : null;
       const b = k && best.get(k);
-      if (k && (!b || rank(v) > rank(b) || (rank(v) === rank(b) && area(v.f.bb) > area(b.f.bb)))) best.set(k, v);
+      const size = (x) => (x.pr.kind === "nb" ? nearArea(x.f.bb) || area(x.f.bb) / 1e3 : area(x.f.bb));
+      if (k && (!b || rank(v) > rank(b) || (rank(v) === rank(b) && size(v) > size(b)))) best.set(k, v);
     });
     best.forEach((v) => {
       const pr = v.pr, c = v.own.c;
@@ -540,7 +551,9 @@ function mainMap(ctx) {
         const fq = net.useOnline ? c?.frequency : pr.frequency;
         lbl(center(v.f), `<small>${esc(pr.name)}</small>${fq ? `<br><span class="freq${c ? " on" : ""}">${esc(fq)}</span>` : ""}`);
       } else {
-        lbl(center(v.f), `<small>${esc(displayName(c.callsign))}</small><br><span class="freq on">${esc(c.frequency)}</span>`, area(v.f.bb));
+        // sąsiad: punkt wewnątrz wielokąta (środek ramki wypada poza wklęsłe sektory)
+        const at = (pr.kind === "nb" && (labelPoint(v.f, NEAR) || labelPoint(v.f))?.at) || center(v.f);
+        lbl(at, `<small>${esc(displayName(c.callsign))}</small><br><span class="freq on">${esc(c.frequency)}</span>`, area(v.f.bb));
       }
     });
     declutter();
