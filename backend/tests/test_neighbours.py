@@ -284,6 +284,11 @@ def test_match_positions_neighbour_twin():
     r = match_positions([{"callsign": "EKDK_CTR", "frequency": "136.555", "cid": 1},
                          {"callsign": "EKDK_UN_CTR", "frequency": "136.555", "cid": 2}], pos, prefer)
     assert r["EKDK_UN_CTR"]["cid"] == 2 and "alias_of" not in r["EKDK_UN_CTR"]
+    # EKDK_CTR zajęty przez kogoś innego (dokładny znak): drugi kontroler jest pod EKDK_UN_CTR jako osobna osoba
+    for feed in ([{"callsign": "EKDK_1_CTR", "frequency": "136.555", "cid": 1}, {"callsign": "EKDK_CTR", "frequency": "118.000", "cid": 2}],
+                 [{"callsign": "EKDK_CTR", "frequency": "118.000", "cid": 2}, {"callsign": "EKDK_1_CTR", "frequency": "136.555", "cid": 1}]):
+        r = match_positions(feed, pos, prefer)
+        assert r["EKDK_CTR"]["cid"] == 2 and r["EKDK_UN_CTR"]["cid"] == 1 and "alias_of" not in r["EKDK_UN_CTR"]
 
 
 def test_merge_positions_frequency_from_neighbour_file():

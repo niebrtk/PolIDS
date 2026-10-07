@@ -88,6 +88,9 @@ def match_positions(controllers: list[dict], positions: list, prefer: Collection
         if hit not in prefer and twins:
             alias.setdefault(min(twins, key=lambda ip: ip[0])[1].callsign, controller_info(c) | {"alias_of": hit})
     for cs, info in alias.items():
+        if online.get(info["alias_of"], {}).get("callsign") != info["callsign"]:
+            # stanowisko `hit` zajął inny kontroler: ten jest tylko pod znakiem sąsiada, bez alias_of
+            info = {k: v for k, v in info.items() if k != "alias_of"}
         online.setdefault(cs, info)
     return online
 

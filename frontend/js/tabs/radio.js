@@ -240,7 +240,7 @@ export default {
       { sep: true },
       { id: "online", label: "ONLINE", render: listView((ps) => {
         const al = R.aliased();  // ten sam kontroler pod dwoma znakami: zostaje wiersz ze znakiem z pliku sąsiada
-        const list = ps.filter((p) => (st.online[p.callsign] && !al.has(p.callsign)) || st.bookings[p.callsign]);
+        const list = ps.filter((p) => !al.has(p.callsign) && (st.online[p.callsign] || st.bookings[p.callsign]));
         const known = new Set(list.map((p) => st.online[p.callsign]?.callsign));
         // zalogowani spoza pliku .ese i vacs-data (np. nowe stanowiska) też są na liście
         const extra = st.controllers.filter((c) => !known.has(c.callsign))

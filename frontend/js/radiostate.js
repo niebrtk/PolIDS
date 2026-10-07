@@ -127,7 +127,8 @@ export function netText(count = (n) => `${n} online`) {
 }
 // stanowiska, pod którymi zalogowany kontroler jest też wpisany znakiem z pliku sąsiada (EKDK_CTR → EKDK_UN_CTR,
 // pole alias_of z /api/radio/online): liczymy go raz, pod znakiem z pliku sąsiada, bo ten ma dokładne sektory
-export const aliased = () => new Set(Object.values(state.online).map((o) => o?.alias_of).filter(Boolean));
+export const aliased = () => new Set(Object.values(state.online)
+  .filter((o) => o?.alias_of && state.online[o.alias_of]?.callsign === o.callsign).map((o) => o.alias_of));
 // zalogowani w sieci, bez ATIS (to nie jest stanowisko kontroli)
 export const onlineList = () => {
   const al = aliased();
