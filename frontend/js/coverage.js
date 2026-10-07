@@ -60,7 +60,8 @@ export const accText = (m) => Object.entries(m || {}).map(([s, ls]) => `${s} ${l
 // within: [lonMin, latMin, lonMax, latMax] – szukaj tylko w tej ramce (np. część sektora sąsiada blisko Polski).
 const labelCache = new Map();
 export function labelPoint(f, within = null) {
-  const key = `${f.properties.fir || ""}/${f.properties.name}/${f.properties.lower_ft}/${within || ""}`;
+  // klucz wg kształtu: u sąsiadów ta sama nazwa i dolna granica bywa przy różnych wielokątach (EDMM ALB, ETSIA)
+  const key = `${geomKey(f)}/${within || ""}`;
   if (labelCache.has(key)) return labelCache.get(key);
   const g = f.geometry;
   const polys = g.type === "Polygon" ? [g.coordinates] : g.type === "MultiPolygon" ? g.coordinates : [];

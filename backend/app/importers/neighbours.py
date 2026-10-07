@@ -40,11 +40,38 @@ def source_key(path: Path) -> str | None:
     return next((k for k in NB_SOURCES if k in stem), None)
 
 
-def default_rwy(rwy: str) -> bool:
-    """Domyślna konfiguracja sektorów zależnych od pasa (ACTIVE): kierunki zachodnie i północne (pasy 19–36),
-    przy przeważającym w tym rejonie wietrze z zachodu. Pas bez numeru traktujemy jak aktywny."""
+WIND_FROM = 250  # przeważający wiatr w tym rejonie (z zachodu–południowego zachodu)
+
+
+def _rwy_num(rwy: str) -> int | None:
     m = re.match(r"\d{1,2}", rwy or "")
-    return not m or int(m.group()) >= 19
+    return int(m.group()) if m else None
+
+
+def pick_runways(sectors: list[dict]) -> dict[str, int]:
+    """Domyślna konfiguracja sektorów zależnych od pasa (ACTIVE): jeden kierunek na lotnisko, najbliższy wiatrowi
+    z WIND_FROM (LKPR 24, nie jednocześnie 24 i 30, które w pliku LKAA są alternatywnymi układami TMA).
+    Pasy równoległe (24L/24R) mają ten sam numer, więc zostają razem."""
+    nums: dict[str, set[int]] = {}
+    for s in sectors:
+        for a in s["active"]:
+            icao, _, rwy = a.partition(":")
+            if (n := _rwy_num(rwy)) is not None:
+                nums.setdefault(icao, set()).add(n)
+    dist = lambda n: min(abs(n * 10 - WIND_FROM), 360 - abs(n * 10 - WIND_FROM))  # noqa: E731
+    return {icao: min(ns, key=lambda n: (dist(n), -n)) for icao, ns in nums.items()}
+
+
+def rwy_active(active: list[str], chosen: dict[str, int]) -> bool:
+    """Sektor bez ACTIVE jest zawsze; z ACTIVE – gdy któryś wpis to wybrany pas lotniska (albo pas bez numeru)."""
+    if not active:
+        return True
+    for a in active:
+        icao, _, rwy = a.partition(":")
+        n = _rwy_num(rwy)
+        if n is None or chosen.get(icao) == n:
+            return True
+    return False
 
 
 def _simplify(pts: list[list[float]], tol: float) -> list[list[float]]:
@@ -97,11 +124,11 @@ def select_sectors(data: dict, key: str) -> tuple[list[dict], list[dict]]:
     Wynik: (sektory {fir, name, lower_ft, upper_ft, owners: [znaki], active: [..], geometry}, stanowiska z kolejności)."""
     firs = set(NB_SOURCES[key]["firs"])
     by_id = {p["position_id"]: p for p in data["positions"]}
+    home = [s for s in data["sectors"] if s["fir"].upper() in firs and not _TECH.match(s["name"]) and s["lower_ft"] < 66000]
+    chosen = pick_runways(home)
     sectors, used = [], {}
-    for s in data["sectors"]:
-        if s["fir"].upper() not in firs or _TECH.match(s["name"]) or s["lower_ft"] >= 66000:
-            continue
-        if s["active"] and not any(default_rwy(a.partition(":")[2]) for a in s["active"]):
+    for s in home:
+        if not rwy_active(s["active"], chosen):
             continue
         ring = json.loads(s["geometry"])["coordinates"][0]
         if not _in_region(ring):
@@ -113,6 +140,8 @@ def select_sectors(data: dict, key: str) -> tuple[list[dict], list[dict]]:
                 owners.append(p["callsign"])
                 if not p["callsign"].upper().startswith("EP"):
                     used[p["callsign"]] = p
+        if not owners:  # sektory tylko do wyświetlania (bez OWNER): nikt ich nie obsługuje, zasłaniałyby obsadzone
+            continue
         sectors.append({**s, "owners": owners,
                         "geometry": json.dumps({"type": "Polygon", "coordinates": [simplify_ring(ring)]})})
     return sectors, list(used.values())

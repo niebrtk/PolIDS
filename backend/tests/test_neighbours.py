@@ -11,7 +11,7 @@ from sqlalchemy.pool import StaticPool
 from backend.app.config import DATA_DIR
 from backend.app.database import Base
 from backend.app.importers.ese import parse_ese, split_sector_name
-from backend.app.importers.neighbours import NB_SOURCES, default_rwy, select_sectors, simplify_ring, source_key
+from backend.app.importers.neighbours import NB_SOURCES, pick_runways, rwy_active, select_sectors, simplify_ring, source_key
 from backend.app.importers.sct import read_text
 from backend.app.models import AtcPosition, NbPosition, NbSector, Sector
 from backend.app.routers.nav import slices
@@ -54,6 +54,21 @@ BORDER:1:2
 SECTOR:LKAA LKPR06_TMA 000 125:00000:12500
 OWNER:PRA:C
 ACTIVE:LKPR:06
+BORDER:1:2
+
+SECTOR:LKAA LKPR30_TMA 000 125:00000:12500
+OWNER:PRA:C
+ACTIVE:LKPR:30
+BORDER:1:2
+
+SECTOR:LKAA LKKB_CTR_24-30 000 020:00000:02000
+OWNER:PRA
+ACTIVE:LKPR:24
+ACTIVE:LKPR:30
+BORDER:1:2
+
+SECTOR:LKAA PHA_CTA_DISPLAY 000 095:00000:09500
+ALTOWNER:Praha:PRA
 BORDER:1:2
 
 SECTOR:LKAA TECH LOW 000 095:00000:09500
@@ -103,8 +118,9 @@ def test_parse_circles_active_and_msaw():
 def test_select_sectors_takes_only_home_fir_and_resolves_owners_per_file():
     sectors, positions = select_sectors(parse_ese(NB_TEXT, airport=lambda icao: (49.94, 14.03)), "LKAA")
     names = {s["name"] for s in sectors}
-    # bez kopii EPWW, bez cudzego FIR-u (LZBB), bez wycinka technicznego i bez wariantu pasa 06 (domyślnie pasy 19–36)
-    assert names == {"NL", "LKPR24_TMA", "LKBE_ATZ", "RING"}
+    # bez kopii EPWW, bez cudzego FIR-u (LZBB), bez wycinka technicznego, bez sektora bez OWNER (tylko ALTOWNER)
+    # i tylko jeden układ pasów LKPR (24; 06 i 30 to układy alternatywne), sektor wspólny 24-30 zostaje
+    assert names == {"NL", "LKPR24_TMA", "LKKB_CTR_24-30", "LKBE_ATZ", "RING"}
     nl = next(s for s in sectors if s["name"] == "NL")
     # ID "C" i "L" z tego pliku → znaki z tego pliku (w pliku EPWW "CL" to EPWW_C_CTR)
     assert nl["owners"] == ["LKAA_N_CTR", "LKAA_CTR"]
@@ -119,10 +135,15 @@ def test_select_sectors_outside_region_and_above_fl660():
     assert "NL" not in {s["name"] for s in select_sectors(parse_ese(high), "LKAA")[0]}
 
 
-@pytest.mark.parametrize("rwy,ok", [("24", True), ("30", True), ("19L", True), ("06", False), ("12", False),
-                                    ("01R", False), ("", True), ("H1", True)])
-def test_default_rwy(rwy, ok):
-    assert default_rwy(rwy) is ok
+def test_pick_runways_one_direction_per_airport():
+    sec = lambda *a: {"active": list(a)}  # noqa: E731
+    chosen = pick_runways([sec("LKPR:06"), sec("LKPR:12"), sec("LKPR:24", "LKPR:30"), sec("EDDH:05", "EDDH:15"),
+                           sec("EDDH:23"), sec("EDDH:33"), sec("EDDB:24L", "EDDB:24R"), sec("EDDB:06L"), sec("EDDN:10"),
+                           sec("EDDN:28"), sec("ESSA:01L"), sec("ESSA:19R")])
+    assert chosen == {"LKPR": 24, "EDDH": 23, "EDDB": 24, "EDDN": 28, "ESSA": 19}
+    assert rwy_active([], chosen) and rwy_active(["EDDB:24R"], chosen) and rwy_active(["EDDB:24L"], chosen)
+    assert not rwy_active(["LKPR:30"], chosen) and rwy_active(["LKPR:30", "LKPR:24"], chosen)
+    assert rwy_active(["XXXX:H1"], chosen)  # pas bez numeru: zawsze
 
 
 def test_source_key():
@@ -213,3 +234,29 @@ def test_real_neighbour_files():
         assert any(known[key] in s["owners"] for s in sectors), key
         assert not any(cs.startswith("EP") for s in sectors for cs in s["owners"][:1]), key
         assert not any(p["callsign"].startswith("EP") for p in positions), key
+        assert all(s["owners"] for s in sectors), key
+    lk = {s["name"] for s in select_sectors(parse_ese(read_text(files["LKAA"])), "LKAA")[0]}
+    assert any(n.startswith("LKPR24_") for n in lk) and not any(n.startswith(("LKPR30_", "LKPR06_", "LKPR12_")) for n in lk)
+
+
+def test_neighbour_file_removed_and_restored(db, tmp_path, monkeypatch):
+    """Usunięty plik sąsiada znika z bazy, a przywrócony (z tą samą datą modyfikacji) wczytuje się ponownie."""
+    import shutil
+
+    from sqlalchemy import func, select
+
+    from backend.app.importers import seed
+    monkeypatch.setattr(seed, "NB_DIR", tmp_path)
+    f = tmp_path / "SF_-_LKAA.ESE"
+    f.write_text(NB_TEXT, encoding="utf-8")
+    count = lambda: db.scalar(select(func.count()).select_from(NbSector))  # noqa: E731
+    seed.import_neighbours(db)
+    n, st = count(), f.stat().st_mtime
+    assert n > 0
+    shutil.move(f, tmp_path.parent / f.name)
+    seed.import_neighbours(db)
+    assert count() == 0
+    shutil.move(tmp_path.parent / f.name, f)
+    assert f.stat().st_mtime == st  # ten sam plik, ta sama data modyfikacji
+    seed.import_neighbours(db)
+    assert count() == n

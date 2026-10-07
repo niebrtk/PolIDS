@@ -153,6 +153,9 @@ def import_neighbours(db: Session, force: bool = False) -> list[dict]:
     keys = {k for p in files if (k := source_key(p))}
     db.execute(delete(NbSector).where(NbSector.source.not_in(keys)))
     db.execute(delete(NbPosition).where(NbPosition.source.not_in(keys)))
+    # zapomnij usunięte pliki: przywrócony plik (z tą samą datą modyfikacji) wczyta się ponownie
+    db.execute(delete(ImportLog).where(ImportLog.filename.like("neighbours/%"),
+                                       ImportLog.filename.not_in([f"neighbours/{p.name}" for p in files])))
     db.commit()
     return results
 

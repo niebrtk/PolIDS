@@ -188,7 +188,8 @@ vpandora/
   w `data/import/neighbours/` (tylko rejon wokół Polski, bez sektorów technicznych i powyżej FL660). Z każdego pliku bierzemy
   wyłącznie FIR-y, które ten pakiet utrzymuje: pakiet ukraiński (AIRAC 2512) ma stare polskie sektory, więc bierzemy z niego
   tylko Lwów, a polskie sektory i stanowiska zawsze są z naszego pliku. Sektory zależne od pasa (`ACTIVE`) są rysowane
-  w konfiguracji zachodniej/północnej (pasy 19–36), bo aplikacja nie zna pasów w użyciu u sąsiadów. Danię (EKDK) i Białoruś (UMMV)
+  w jednym układzie na lotnisko: kierunek najbliższy przeważającemu wiatrowi z ok. 250° (np. Praga 24, Hamburg 23,
+  Berlin 24L/24R), bo aplikacja nie zna pasów w użyciu u sąsiadów. Sektory bez listy OWNER (tylko do wyświetlania) pomijamy. Danię (EKDK) i Białoruś (UMMV)
   nadal rysujemy z kopii w naszym pliku `.ese`.
 - Zasięg pozostałych stanowisk sąsiednich (bez sektora w żadnym pliku) jest przybliżony: cały sektor/FIR z VATSpy albo okrąg 30 NM (APP/DEP)
   i 10 NM (TWR), bez podziału pionowego. Mapa i legenda to zaznaczają.
