@@ -132,10 +132,14 @@ function listNote(list) {
 const SRC = { kb: "baza wiedzy VATSIM Germany (Centersektoren)", ese: "plik .ese", loa: "LOA" };
 function nameTip(p, radio) {
   const lines = [[radio, p.sector].filter(Boolean).join(" · ")];
-  const loaT = p.loa?.titles?.join(", ");
-  if (p.radio_src === "prefix") lines.push(`znak radiowy jak u pozostałych stanowisk ${p.prefix} ${p.facility} z pliku .ese (przyjęty)`);
-  else if (p.radio_src) lines.push(`znak radiowy: ${p.radio_src === "loa" ? loaT : SRC[p.radio_src]}`);
-  if (p.sector_src) lines.push(`sektor: ${p.sector_src === "loa" ? loaT : SRC[p.sector_src]}`);
+  const loaT = p.loa?.titles?.join(", ") || "LOA";
+  const src = (k) => (k === "loa" ? loaT : SRC[k]);
+  if (p.radio_src === "prefix") lines.push(`znak radiowy przyjęty jak u pozostałych stanowisk ${p.prefix} ${p.facility}`);
+  if (p.radio_src && p.radio_src === p.sector_src) lines.push(`znak radiowy i sektor: ${src(p.radio_src)}`);
+  else {
+    if (p.radio_src && p.radio_src !== "prefix") lines.push(`znak radiowy: ${src(p.radio_src)}`);
+    if (p.sector_src) lines.push(`sektor: ${src(p.sector_src)}`);
+  }
   if (p.name && p.name !== radio) lines.push(`w pliku .ese: ${p.name}`);
   if (p.kb?.limits) lines.push(`zakres: ${p.kb.limits}`);
   if (p.kb?.covers) lines.push(`obejmuje: ${p.kb.covers}`);
@@ -199,7 +203,9 @@ function listView(build, { wide = false, goto, nb } = {}) {
         if (lb) lb.scrollTop = loaTop;
       }
       const byCs = Object.fromEntries(ps.map((p) => [p.callsign, p]));
-      const lens = [...body.querySelectorAll(".radio-row[data-cs]")].map((r) => pidLen(byCs[r.dataset.cs] || { callsign: r.dataset.cs }));
+      // szerokość kolumny ID tylko z wierszy, które ją mają (lotniska VFR są bez ID)
+      const lens = [...body.querySelectorAll(".radio-row[data-cs] .pid")].map((el) => el.closest(".radio-row").dataset.cs)
+        .map((cs) => pidLen(byCs[cs] || { callsign: cs }));
       body.style.setProperty("--pid-ch", Math.max(6, ...lens));
       pane.scrollTop = top;
     };
@@ -242,7 +248,7 @@ const jumpBar = (kinds) => `<div class="ad-jump">${kinds.filter((k) => k.g.lengt
   `<button data-jump="${esc(key)}" class="${grpState(ps)}" title="${esc(k.tip(key, ps))}">${esc(key)}</button>`).join("")}`).join("")}</div>`;
 // sąsiedzi i INNE: najpierw grupy ze stanowiskami ACC/CTR (jak kolejność listy), potem lotniska
 const nbJump = (groups) => {
-  const fir = (k, ps) => R.FIR_COLORS[R.firKey(ps[0]?.callsign, ps[0]?.fir)]?.name || ps.find((p) => p.fir_name)?.fir_name || "";
+  const fir = (k, ps) => ps.find((p) => p.fir_name)?.fir_name || R.FIR_COLORS[R.firKey(ps[0]?.callsign, ps[0]?.fir)]?.name || "";
   return jumpBar([{ short: "ACC", g: groups.filter(([, ps]) => ps.some(isAcc)), tip: (k, ps) => [k, fir(k, ps)].filter(Boolean).join(" · ") },
     { short: "AD", g: groups.filter(([, ps]) => !ps.some(isAcc)), tip: (k) => names[k] || k }]);
 };
@@ -269,12 +275,13 @@ function loaTransfers(rows, from, to) {
   const sec = rows.some((t) => t.from || t.to);
   const head = `<tr><th>Ruch</th><th>COP</th><th>Poziom</th>${sec ? "<th>Z sektora</th><th>Do sektora</th>" : ""}<th>Warunki</th></tr>`;
   const body = rows.map((t) => `<tr data-f="${esc(Object.values(t).join(" ").toLowerCase())}"><td class="trf">${esc(t.traffic)}</td>
-    <td class="cop">${esc(t.cop)}</td><td class="lvl">${esc(t.level)}</td>${sec ? `<td>${esc(t.from)}</td><td>${esc(t.to)}</td>` : ""}
+    <td class="cop">${esc(t.cop)}</td><td class="lvl${t.level?.length > 18 ? " wrap" : ""}">${esc(t.level)}</td>${sec ? `<td>${esc(t.from)}</td><td>${esc(t.to)}</td>` : ""}
     <td class="cond">${esc(t.conditions)}</td></tr>`).join("");
   return `<div class="loa-sec"><h4>${esc(from)} → ${esc(to)} <small>${rows.length}</small></h4>
     <table class="loa-tab${sec ? "" : " nosec"}"><thead>${head}</thead><tbody>${body}</tbody></table></div>`;
 }
-const loaList = (title, items) => (items?.length ? `<div class="loa-sec"><h4>${esc(title)} <small>${items.length}</small></h4>
+const arr = (x) => (Array.isArray(x) ? x : []);
+const loaList = (title, items) => (arr(items).length ? `<div class="loa-sec"><h4>${esc(title)} <small>${items.length}</small></h4>
   <ul>${items.map((x) => `<li data-f="${esc(String(x).toLowerCase())}">${esc(x)}</li>`).join("")}</ul></div>` : "");
 
 function loaPanel(nb, d, ps) {
@@ -283,17 +290,17 @@ function loaPanel(nb, d, ps) {
   if (d?.error) return none(`<span class="error">${esc(d.error)}</span>`);
   const f = d?.firs?.[nb.loa];
   if (!f) return none(`<span class="hint">brak wpisu ${esc(nb.loa)} w data/seed/loa.json</span>`);
-  const tr = f.transfers || [];
+  const tr = arr(f.transfers);
   const out = tr.filter((t) => t.dir === "out"), inn = tr.filter((t) => t.dir === "in");
   const href = pdfHref(f.pdf);
   // stanowiska z LOA: znak radiowy z listy RADIO, gdy LOA go nie podaje (Niemcy: baza wiedzy VATSIM Germany)
   const byCs = Object.fromEntries((ps || []).map((p) => [p.callsign, p]));
-  const pos = (f.positions || []).map((p) => `<tr data-f="${esc(Object.values(p).join(" ").toLowerCase())}">
+  const pos = arr(f.positions).map((p) => `<tr data-f="${esc(Object.values(p).join(" ").toLowerCase())}">
     <td class="${p.side === "EP" ? "ep" : "nb"}">${p.side === "EP" ? "EPWW" : esc(nb.loa)}</td><td class="pcs">${esc(p.callsign)}</td>
     <td>${esc(p.radio || byCs[p.callsign]?.radio || "")}</td><td class="cop">${esc(p.sector)}</td><td class="lvl">${esc(p.frequency)}</td>
     <td class="cond">${esc(p.note)}</td></tr>`).join("");
-  const el = h(`<section class="loa${lsGet(LS_LOA + nb.loa) === "1" ? " open" : ""}">
-    <div class="loa-h" role="button" tabindex="0" title="Rozwiń / zwiń wyciąg z LOA">
+  const el = h(`<section class="loa">
+    <div class="loa-h" role="button" tabindex="0" aria-expanded="false" title="Rozwiń / zwiń wyciąg z LOA">
       <span class="loa-tw">▸</span><b class="loa-tag">LOA</b><span class="loa-t">${esc(f.title)}</span>
       <span class="loa-v">${esc(f.version)}</span>
       <span class="loa-n">przekazania: ${out.length} z EPWW · ${inn.length} do EPWW</span>
@@ -305,15 +312,17 @@ function loaPanel(nb, d, ps) {
         <span class="loa-cnt hint"></span><span class="hint">Wyciąg z PDF (data/seed/loa.json), w razie wątpliwości obowiązuje PDF.</span></div>
       ${loaTransfers(out, "EPWW", nb.loa)}${loaTransfers(inn, nb.loa, "EPWW")}
       <div class="loa-rules">${loaList("Przekazanie kontroli i łączności", f.silent)}${loaList("VFR", f.vfr)}${loaList("Inne zasady", f.other)}</div>
-      ${pos ? `<div class="loa-sec"><h4>Stanowiska i sektory wg LOA <small>${(f.positions || []).length}</small></h4>
+      ${pos ? `<div class="loa-sec"><h4>Stanowiska i sektory wg LOA <small>${arr(f.positions).length}</small></h4>
         <table class="loa-tab pos"><thead><tr><th>Strona</th><th>Stanowisko</th><th>Znak radiowy</th><th>Sektor</th><th>Częst.</th><th>Uwagi</th></tr></thead>
         <tbody>${pos}</tbody></table></div>` : ""}
     </div></section>`);
-  const toggle = () => {
-    el.classList.toggle("open");
-    lsSet(LS_LOA + nb.loa, el.classList.contains("open") ? "1" : "0");
-  };
   const hd = el.querySelector(".loa-h");
+  const toggle = (open = !el.classList.contains("open"), save = true) => {
+    el.classList.toggle("open", open);
+    hd.setAttribute("aria-expanded", String(open));
+    if (save) lsSet(LS_LOA + nb.loa, open ? "1" : "0");
+  };
+  toggle(lsGet(LS_LOA + nb.loa) === "1", false);
   hd.addEventListener("click", (e) => { if (!e.target.closest("a")) toggle(); });
   hd.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); } });
   // filtr: wiersze tabel i zasady zawierające wpisany tekst; sekcje bez trafień znikają

@@ -201,8 +201,6 @@
 .radio-row .nm .sec { margin-left: 9px; font: 13px var(--mono); color: var(--muted); }
 /* znak radiowy przyjęty jak u pozostałych stanowisk ACC z tym prefiksem (nie z bazy wiedzy, LOA ani pliku .ese) */
 .radio-row .nm.der { color: #b9c2b9; }
-/* lotniska VFR: wiersz bez kolumny ID */
-.radio-list.single:not(.vacs) .radio-row:not(:has(.pid)) .cs { width: 170px; }
 
 /* panel LOA (jak panel NM UI): pasek tytułu w jednej linii, po rozwinięciu tabele przewijane we własnym polu */
 .loa { max-width: 1280px; margin: -2px 0 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 3px; }
@@ -241,8 +239,11 @@
 .loa-tab .trf { width: 220px; color: var(--cyan); }
 .loa-tab .cop { width: 90px; color: #fff; font-weight: 700; }
 .loa-tab .lvl { width: 150px; color: var(--yellow); white-space: nowrap; }
+/* długi opis poziomu (ESAA: "FL260 lub cruise level, jeśli niższy") zawija się zamiast poszerzać kolumnę */
+.loa-tab .lvl.wrap { min-width: 150px; white-space: normal; }
 .loa-tab .cond { color: #aab3aa; }
-.loa-tab td:nth-child(4):not(.cond), .loa-tab td:nth-child(5):not(.cond) { width: 110px; white-space: nowrap; }
+/* sektory przekazania (Z / Do) */
+.loa-tab:not(.pos) td:nth-child(4):not(.cond), .loa-tab:not(.pos) td:nth-child(5):not(.cond) { width: 110px; white-space: nowrap; }
 .loa-tab.pos td:first-child { width: 70px; }
 .loa-tab.pos .pcs { width: 120px; color: var(--cyan); }
 .loa-tab.pos td:nth-child(3) { white-space: nowrap; }

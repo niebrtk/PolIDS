@@ -235,7 +235,7 @@ INFO_MID = {"I", "FIS", "IN", "INFO"}  # środek znaku stanowiska informacji (EK
 def _kb_index(names_de: dict) -> dict[str, dict]:
     """names_de.json (positions): login → wpis, także loginy zastępcze (aliases: EDWW_MR1_CTR → EDWW_MRZ_CTR)."""
     out: dict[str, dict] = {}
-    for cs, e in (names_de or {}).items():
+    for cs, e in (names_de.items() if isinstance(names_de, dict) else ()):
         if isinstance(e, dict):
             out[cs.upper()] = e
     for e in list(out.values()):
@@ -248,11 +248,11 @@ def _loa_index(loa_firs: dict) -> dict[str, dict]:
     """Stanowiska sąsiadów wymienione w LOA (strona NB): znak → znak radiowy, sektory, uwagi i tytuły LOA.
     Jedno stanowisko bywa kilka razy (LKAA_U_CTR: sektory NU i SU) – sektory łączymy."""
     out: dict[str, dict] = {}
-    for f in (loa_firs or {}).values():
-        if not isinstance(f, dict):
+    for f in (loa_firs.values() if isinstance(loa_firs, dict) else ()):
+        if not isinstance(f, dict) or not isinstance(f.get("positions"), list):
             continue
-        for lp in f.get("positions") or []:
-            cs = str(lp.get("callsign") or "").upper()
+        for lp in f["positions"]:
+            cs = str(lp.get("callsign") or "").upper() if isinstance(lp, dict) else ""
             if not cs or lp.get("side") != "NB":
                 continue
             e = out.setdefault(cs, {"radio": "", "sectors": [], "notes": [], "titles": []})
