@@ -7,7 +7,8 @@ from fastapi.staticfiles import StaticFiles
 
 from .config import settings
 from .importers.seed import init_db
-from .routers import aerodromes, aircraft, callsigns, docs, meteo, nav, notam, radio, system, vatsim, viff
+from .routers import (aerodromes, aircraft, callsigns, docs, meteo, nav, notam, overview, radio, system, vatsim,
+                      viff)
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
 
@@ -21,7 +22,7 @@ async def lifespan(_app: FastAPI):
 app = FastAPI(title="PolIDS API", version="0.10.1", lifespan=lifespan,
               description="API aplikacji PolIDS – Polish Integrated Display System (VATSIM PL vACC). Dokumentacja interaktywna: /docs")
 
-for r in (system, meteo, aerodromes, notam, aircraft, callsigns, nav, radio, vatsim, viff, docs):
+for r in (system, meteo, aerodromes, overview, notam, aircraft, callsigns, nav, radio, vatsim, viff, docs):
     app.include_router(r.router)
 
 
