@@ -2,7 +2,7 @@
 import os
 import tempfile
 
-os.environ.setdefault("VPANDORA_DATABASE_URL",
+os.environ.setdefault("POLIDS_DATABASE_URL",
                       "sqlite:///" + os.path.join(tempfile.mkdtemp(), "test.db").replace("\\", "/"))
 
 import pytest  # noqa: E402

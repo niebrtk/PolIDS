@@ -3,8 +3,8 @@
 // Serwer zatrzymany (zamknięte okno run.bat): zamiast angielskiego "Failed to fetch" komunikat po polsku i jeden pasek
 // u dołu ekranu; znika po pierwszym udanym zapytaniu (sprawdzamy co 5 s, także gdy żadna zakładka nic nie odświeża).
 // Po powrocie serwera zdarzenie ONLINE_EVENT na window: zakładki z komunikatem błędu od razu pobierają dane ponownie.
-export const OFFLINE_MSG = "brak połączenia z serwerem vPANDORA (okno run.bat zamknięte?)";
-export const ONLINE_EVENT = "vpandora:online";
+export const OFFLINE_MSG = "brak połączenia z serwerem PolIDS (okno run.bat zamknięte?)";
+export const ONLINE_EVENT = "polids:online";
 let offlineBar = null, offlineTimer = null;
 function setOffline(on) {
   if (!on) {
@@ -18,7 +18,7 @@ function setOffline(on) {
     return;
   }
   if (offlineBar) return;
-  offlineBar = h(`<div class="srv-off" role="alert"><b>Brak połączenia z serwerem vPANDORA</b>
+  offlineBar = h(`<div class="srv-off" role="alert"><b>Brak połączenia z serwerem PolIDS</b>
     <span>okno run.bat zamknięte? Uruchom je ponownie, strona połączy się sama.</span></div>`);
   document.body.append(offlineBar);
   offlineTimer = setInterval(() => fetch("/api/config", { cache: "no-store" }).then(() => setOffline(false), () => {}), 5000);
@@ -38,7 +38,7 @@ export async function api(path, options = {}) {
   try { body = await res.json(); } catch { /* pusta odpowiedź albo nie JSON (np. strona błędu) */ }
   if (!res.ok) {
     const msg = body && body.detail ? (typeof body.detail === "string" ? body.detail : JSON.stringify(body.detail))
-      : `Błąd serwera vPANDORA (HTTP ${res.status})`;
+      : `Błąd serwera PolIDS (HTTP ${res.status})`;
     throw new Error(msg);
   }
   return body;
@@ -110,7 +110,7 @@ export function iframeWithFallback(pane, url, note = "") {
   pane.append(h(`<iframe class="embed" src="${esc(url)}" referrerpolicy="no-referrer"></iframe>`));
 }
 
-// Podkłady mapy. CARTO wymaga klucza w parametrze ?key= (VPANDORA_CARTO_API_KEY); bez klucza kafelki dostają
+// Podkłady mapy. CARTO wymaga klucza w parametrze ?key= (POLIDS_CARTO_API_KEY albo VPANDORA_CARTO_API_KEY); bez klucza kafelki dostają
 // znak wodny "API KEY REQUIRED". Dlatego bez klucza (albo gdy CARTO odrzuca klucz, np. 403 przy ograniczeniu
 // domen) używamy szarych podkładów Esri Canvas, które działają bez klucza. "white" = sama biała plansza.
 const CARTO_ATTR = '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>, © <a href="https://carto.com/attributions">CARTO</a>';

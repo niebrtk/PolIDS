@@ -7,7 +7,7 @@ Używamy wyłącznie odczytu (GET):
 - /etfms/scenarios: scenariusze (konfiguracje sektorów), które włączają zestawy traffic volumes,
 - /ifps/callsign?callsign=X: jeden lot (plan, CDM, ATFCM, historia).
 
-Odczyt działa bez klucza. Jeśli autor vIFF wyda klucz, ustaw VPANDORA_VIFF_API_KEY (idzie w nagłówku x-api-key).
+Odczyt działa bez klucza. Jeśli autor vIFF wyda klucz, ustaw POLIDS_VIFF_API_KEY (idzie w nagłówku x-api-key).
 Endpointów zapisujących (POST) aplikacja nigdy nie wywołuje: zmieniają wspólny stan sieci.
 Schematów odpowiedzi nie ma w dokumentacji API, więc nazwy pól poniżej pochodzą z obserwacji odpowiedzi."""
 

@@ -18,8 +18,8 @@ async def lifespan(_app: FastAPI):
     yield
 
 
-app = FastAPI(title="vPANDORA API", version="0.10.1", lifespan=lifespan,
-              description="API dla aplikacji vPANDORA (VATSIM PL vACC). Dokumentacja interaktywna: /docs")
+app = FastAPI(title="PolIDS API", version="0.10.1", lifespan=lifespan,
+              description="API aplikacji PolIDS – Polish Integrated Display System (VATSIM PL vACC). Dokumentacja interaktywna: /docs")
 
 for r in (system, meteo, aerodromes, notam, aircraft, callsigns, nav, radio, vatsim, viff, docs):
     app.include_router(r.router)
@@ -44,3 +44,8 @@ app.mount("/static", StaticFiles(directory=settings.frontend_dir), name="static"
 @app.get("/", include_in_schema=False)
 def index():
     return FileResponse(settings.frontend_dir / "index.html")
+
+
+@app.get("/favicon.ico", include_in_schema=False)
+def favicon():
+    return FileResponse(settings.frontend_dir / "img" / "favicon.ico", media_type="image/x-icon")

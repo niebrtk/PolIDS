@@ -27,7 +27,7 @@ function lvpBox(lvp) {
 
 // Róża wiatrów: pasy jako prostokąty, strzałka wiatru skąd wieje.
 // Kolor = rola jak na paskach postępu lotu (strips.css): ARR żółty, DEP niebieski (ten sam pas do obu: połowa na połowę).
-// Wypełnienie pełne = pas w użyciu wg ATIS; kreskowane = pas preferowany (sugestia vPANDORA).
+// Wypełnienie pełne = pas w użyciu wg ATIS; kreskowane = pas preferowany (sugestia PolIDS).
 const USE_COLOR = { arr: "#ffd84a", dep: "#6db8ff" };
 const ROLE_LABEL = { arr: "ARR", dep: "DEP" };
 function roleSets(status) {
@@ -130,7 +130,7 @@ function windrose(status) {
     <div class="wr-legend"><span><i class="sw-arr"></i>ARR</span><span><i class="sw-dep"></i>DEP</span><span><i class="sw-solid"></i>ATIS</span><span><i class="sw-hatch"></i>sugestia</span></div>`;
 }
 
-// Pas w użyciu z ATIS albo preferowany wg vPANDORA (wiatr, wyposażenie, LVP)
+// Pas w użyciu z ATIS albo preferowany wg PolIDS (wiatr, wyposażenie, LVP)
 function runwayBox(st) {
   const u = st.runway_in_use || {};
   const fromAtis = u.source === "ATIS";
@@ -152,7 +152,7 @@ const roleOrder = (active, sugg) => (d) => (active.arr === d || sugg.arr === d ?
 function runwayTable(st) {
   const { active, sugg } = roleSets(st);
   const tags = (d) => ["arr", "dep"].map((k) => (active[k] === d ? `<span class="tag ${k}">${ROLE_LABEL[k]}</span>`
-    : sugg[k] === d ? `<span class="tag ${k} sugg" title="sugestia vPANDORA">${ROLE_LABEL[k]}?</span>` : "")).join("");
+    : sugg[k] === d ? `<span class="tag ${k} sugg" title="sugestia PolIDS">${ROLE_LABEL[k]}?</span>` : "")).join("");
   // pasy w użyciu na górze, potem z podejściem, na końcu pozostałe (np. trawiaste): w niskim oknie tabela przewija się
   const order = roleOrder(active, sugg);
   const rank = (r) => order(r.designator) * 2 + ((r.equipment || []).length ? 0 : 1);
@@ -170,7 +170,7 @@ function runwayTable(st) {
       <td class="num" style="color:${tw ? "var(--bad)" : "inherit"}">${r.headwind === null ? "–" : (tw ? "TW " : "") + kt(r.headwind) + " kt"}</td>
       <td class="num">${r.crosswind === null ? "–" : kt(r.crosswind) + " kt" + (!kt(r.crosswind) ? "" : r.crosswind > 0 ? " R" : " L")}</td></tr>`;
     }).join("")}
-  </tbody></table><div class="hint">TW = wiatr w plecy · ARR? / DEP? = sugestia vPANDORA · najedź na pas: szerokość, nawierzchnia, podejścia</div>`;
+  </tbody></table><div class="hint">TW = wiatr w plecy · ARR? / DEP? = sugestia PolIDS · najedź na pas: szerokość, nawierzchnia, podejścia</div>`;
 }
 
 // Wiatr przy ziemi i na 3000 ft w punkcie podejścia każdego pasa (jak METEO › WIND, bez mapy): METAR i model 10 m

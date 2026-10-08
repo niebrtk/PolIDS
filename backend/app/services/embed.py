@@ -38,7 +38,7 @@ async def check(url: str, ttl: int = 3600) -> dict:
         return hit[1]
     try:
         async with httpx.AsyncClient(timeout=settings.http_timeout, follow_redirects=True,
-                                     headers={"User-Agent": "Mozilla/5.0 vPANDORA (VATSIM PL vACC)"}) as client:
+                                     headers={"User-Agent": "Mozilla/5.0 PolIDS (VATSIM PL vACC)"}) as client:
             resp = await client.get(url)
     except httpx.HTTPError as exc:
         return {"url": url, "embeddable": None, "reason": f"brak połączenia: {exc.__class__.__name__}"}

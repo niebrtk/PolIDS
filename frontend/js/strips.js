@@ -9,7 +9,7 @@ const STATE_CLASS = { FI: "fi", SI: "si", SU: "su", AA: "aa", TA: "ta" };
 // kolor CTOT = opóźnienie jak w liście lotów NM: < 15 min, < 30, < 45, ≥ 45
 const delayClass = (d) => (d === null || d === undefined || d < 1 ? "" : d < 15 ? "d15" : d < 30 ? "d30" : d < 45 ? "d45" : "d60");
 const RULES = { I: "IFR", V: "VFR", Y: "IFR/V", Z: "VFR/I" };
-const RWY_SRC = { ATIS: "z ATIS", vPANDORA: "sugestia vPANDORA (brak ATIS)", CDM: "przydzielony w EuroScope (CDM)" };
+const RWY_SRC = { ATIS: "z ATIS", PolIDS: "sugestia PolIDS (brak ATIS)", CDM: "przydzielony w EuroScope (CDM)" };
 const WAKE = { L: "lekki", M: "średni", H: "ciężki", J: "super (A388)" };
 
 const ph = (t) => `<span class="ph">${t}</span>`;
@@ -203,13 +203,13 @@ export function mountStrips(el, icao, { onUpdate } = {}) {
 
   const bar = (d) => {
     const u = d.runway_in_use || {};
-    const src = u.source === "ATIS" ? `ATIS ${esc(d.atis?.letter || "")}` : "sugestia vPANDORA";
+    const src = u.source === "ATIS" ? `ATIS ${esc(d.atis?.letter || "")}` : "sugestia PolIDS";
     const errs = [d.network_error, d.viff_error].filter(Boolean);
     const n = (k) => d[k].length;
     const noProc = !d.procedures?.sid?.length && !d.procedures?.star?.length;
     return `<span class="kv" title="Pas startowy w użyciu (${esc(src)})"><i>DEP</i><b class="dep">${esc(u.dep || "–")}</b></span>
       <span class="kv" title="Pas do lądowania w użyciu (${esc(src)})"><i>ARR</i><b class="arr">${esc(u.arr || "–")}</b></span>
-      ${u.source === "ATIS" ? "" : `<span class="kv sugg">sugestia vPANDORA, brak pasa z ATIS</span>`}
+      ${u.source === "ATIS" ? "" : `<span class="kv sugg">sugestia PolIDS, brak pasa z ATIS</span>`}
       <span class="kv"><i>ATIS</i><b>${esc(d.atis?.letter || "–")}</b></span>
       <span class="kv" title="A-CDM: TOBT, TSAT, TTOT z vIFF${d.viff_error ? " (vIFF niedostępny: nie wiadomo)" : ""}"><i>A-CDM</i>${d.viff_error ? "?" : d.cdm ? "tak" : "nie"}</span>
       ${noProc ? `<span class="kv sugg">brak SID/STAR ${esc(d.icao)} w pliku .ese</span>` : ""}

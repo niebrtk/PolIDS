@@ -111,7 +111,7 @@ async def status(icao: str, db: Session = Depends(get_db)):
         in_use = {"arr": atis["arr"] or atis["dep"], "dep": atis["dep"] or atis["arr"], "source": "ATIS",
                   "reason": f"Z ATIS {atis['letter'] or ''}".strip()}
     else:
-        in_use = {**pref, "source": "vPANDORA"}
+        in_use = {**pref, "source": "PolIDS"}
 
     qfe = qfe_from_qnh(parsed.qnh, ad.elevation_ft or 0) if parsed and parsed.qnh else None
     return {

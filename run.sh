@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Uruchomienie vPANDORA na macOS/Linux: bash run.sh
+# Uruchomienie PolIDS na macOS/Linux: bash run.sh
 # Pierwsze uruchomienie tworzy srodowisko .venv i instaluje biblioteki.
 set -e
 cd "$(dirname "$0")"

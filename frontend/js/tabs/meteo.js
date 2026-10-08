@@ -331,7 +331,7 @@ function windTab(pane) {
       ${mode === "3000" ? `<p class="wnd-note">Punkt podejścia: FAF/IF, na którym kończą się STAR z przejściem do podejścia (plik .ese), jeśli leży 2.5–15 NM od progu
         i do 15° od osi; inaczej punkt na przedłużeniu osi, w którym ścieżka 3° osiąga 3000 ft. Kliknij pas, żeby przenieść tam punkt prognozy Windy.</p>`
         : `<p class="wnd-note">Wiatr 0 ft: METAR oraz model 10 m nad punktem lotniska; składowe względem kursu każdego pasa.</p>`}
-      <p class="wnd-note">H = czołowy, T = w plecy, L/R = boczny z lewej/prawej, kt. ${inUse ? `ARR/DEP: pas w użyciu (${inUse.source === "ATIS" ? "ATIS" : "? = sugestia vPANDORA"}).` : ""}
+      <p class="wnd-note">H = czołowy, T = w plecy, L/R = boczny z lewej/prawej, kt. ${inUse ? `ARR/DEP: pas w użyciu (${inUse.source === "ATIS" ? "ATIS" : "? = sugestia PolIDS"}).` : ""}
         Windy pokazuje model ECMWF, Open-Meteo zwykle ICON, więc wartości mogą się różnić.</p>
     </div>`;
   };
@@ -363,7 +363,7 @@ function windTab(pane) {
     bar();
     side();
     loadWind();
-    // pas do lądowania w użyciu (ATIS albo sugestia vPANDORA) jako domyślny, jeśli odpowiedź przyjdzie szybko
+    // pas do lądowania w użyciu (ATIS albo sugestia PolIDS) jako domyślny, jeśli odpowiedź przyjdzie szybko
     const st = api(`/api/aerodromes/${icao}/status`).then((x) => x.runway_in_use || null).catch(() => null);
     const first = await Promise.race([st, new Promise((res) => setTimeout(() => res(null), 1500))]);
     if (dead || my !== seq) return;

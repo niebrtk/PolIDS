@@ -1,7 +1,7 @@
 import { api, h, iframeWithFallback } from "../api.js";
 import { embedBar } from "./aip.js";
 
-// Frazeologia: "Say Again? The Phraseology Database" z EUROCONTROL Learning Zone (adres z VPANDORA_PHRASEOLOGY_URL).
+// Frazeologia: "Say Again? The Phraseology Database" z EUROCONTROL Learning Zone (adres z POLIDS_PHRASEOLOGY_URL).
 // Zawsze próbujemy pokazać stronę w ramce. Backend przy tym sprawdza nagłówki X-Frame-Options / CSP; jeśli serwis
 // zabrania osadzania, przeglądarka pokaże w ramce komunikat o blokadzie, a nad ramką widać, dlaczego, i przycisk
 // otwierający frazeologię w nowej karcie.

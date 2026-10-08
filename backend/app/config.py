@@ -1,18 +1,28 @@
 """Ustawienia aplikacji. Każdą wartość można nadpisać zmienną środowiskową
-z prefiksem VPANDORA_ albo wpisem w pliku .env w katalogu głównym projektu."""
+z prefiksem POLIDS_ albo wpisem w pliku .env w katalogu głównym projektu.
+Stary prefiks VPANDORA_ (sprzed zmiany nazwy) nadal działa, np. klucz ustawiony przez setx VPANDORA_CARTO_API_KEY;
+przy obu wartościach wygrywa POLIDS_."""
 
 from pathlib import Path
 
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, DotEnvSettingsSource, EnvSettingsSource, SettingsConfigDict
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
 DATA_DIR = ROOT_DIR / "data"
+LEGACY_PREFIX = "VPANDORA_"
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix="VPANDORA_", env_file=ROOT_DIR / ".env", extra="ignore")
+    model_config = SettingsConfigDict(env_prefix="POLIDS_", env_file=ROOT_DIR / ".env", extra="ignore")
 
-    database_url: str = f"sqlite:///{(DATA_DIR / 'vpandora.db').as_posix()}"
+    @classmethod
+    def settings_customise_sources(cls, settings_cls, init_settings, env_settings, dotenv_settings,
+                                   file_secret_settings):
+        legacy_env = EnvSettingsSource(settings_cls, env_prefix=LEGACY_PREFIX)
+        legacy_dotenv = DotEnvSettingsSource(settings_cls, env_file=ROOT_DIR / ".env", env_prefix=LEGACY_PREFIX)
+        return init_settings, env_settings, dotenv_settings, legacy_env, legacy_dotenv, file_secret_settings
+
+    database_url: str = f"sqlite:///{(DATA_DIR / 'polids.db').as_posix()}"
     seed_dir: Path = DATA_DIR / "seed"
     docs_dir: Path = DATA_DIR / "docs"
     photos_dir: Path = DATA_DIR / "photos"

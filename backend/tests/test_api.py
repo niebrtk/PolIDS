@@ -1,7 +1,7 @@
 import os
 import tempfile
 
-os.environ["VPANDORA_DATABASE_URL"] = "sqlite:///" + os.path.join(tempfile.mkdtemp(), "test.db").replace("\\", "/")
+os.environ["POLIDS_DATABASE_URL"] = "sqlite:///" + os.path.join(tempfile.mkdtemp(), "test.db").replace("\\", "/")
 
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
@@ -34,7 +34,7 @@ def client():
 
 
 def test_frontend_and_config(client):
-    assert "vPANDORA" in client.get("/").text
+    assert "PolIDS" in client.get("/").text
     cfg = client.get("/api/config").json()
     assert cfg["links"]["inop"].startswith("https://om.plvacc.pl")
     assert "learningzone.eurocontrol.int" in cfg["links"]["phraseology"] and "carto_api_key" in cfg

@@ -25,7 +25,7 @@ from .neighbours import import_nb_ese, source_key
 from .navdata import import_airways, import_icao_airports, import_isec
 from .sct import import_sct
 
-log = logging.getLogger("vpandora.seed")
+log = logging.getLogger("polids.seed")
 IMPORT_DIR = DATA_DIR / "import"
 NB_DIR = IMPORT_DIR / "neighbours"  # pliki .ese FIR-ów sąsiednich (osobny import, nie nadpisują EPWW)
 

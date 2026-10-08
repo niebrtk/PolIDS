@@ -51,6 +51,8 @@ a { color: var(--green-text); }
 
 .menu { width: 150px; flex: none; background: #050605; border-right: 1px solid var(--line); padding: 6px; display: flex; flex-direction: column; }
 .menu nav { flex: 1; overflow-y: auto; }
+.menu .brand { display: block; padding: 4px 4px 8px; margin-bottom: 6px; border-bottom: 1px solid var(--line); }
+.menu .brand img { display: block; width: 100%; height: auto; max-height: 40px; object-fit: contain; }
 .clockbox { text-align: center; padding: 8px 0 4px; border-top: 1px solid var(--line); }
 .clock { font: 700 20px var(--mono); color: #fff; }
 
@@ -266,7 +268,7 @@ table.data.rwy-table td.rwy { font: 700 20px var(--mono); color: #fff; }
 table.data.rwy-table tr.inuse td { background: #14240f !important; }
 table.data.rwy-table tr.inuse td.rwy { color: var(--ok); }
 .tag.use { color: var(--ok); border-color: var(--ok); }
-/* role pasa: ARR zielony, DEP niebieski; pełne = z ATIS, przerywane = sugestia vPANDORA */
+/* role pasa: ARR zielony, DEP niebieski; pełne = z ATIS, przerywane = sugestia PolIDS */
 .tag.arr { color: #071a00; background: #5fd23a; border-color: #5fd23a; }
 .tag.dep { color: #00191d; background: #3ec7e0; border-color: #3ec7e0; }
 .tag.sugg { background: transparent; border-style: dashed; }
@@ -402,7 +404,8 @@ td.tags .tag { padding: 0 4px; margin-right: 2px; font-size: 11px; }
 .about-info { flex: 0 1 560px; }
 .about-info dl.props { gap: 3px 16px; }
 .about-info dl.props dd { font-family: var(--sans); }
-.logo { font: 900 52px/1 var(--ui); letter-spacing: 6px; color: #fff; font-style: italic; padding-top: 6px; }
+.logo { padding-top: 6px; }
+.logo img { display: block; height: 96px; width: auto; }
 .logo small { display: block; font: 12px var(--ui); letter-spacing: 1.5px; font-style: normal; color: var(--muted); margin-top: 8px; }
 .about-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 8px; margin-bottom: 18px; }
 .about-tile { display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; text-align: left; cursor: pointer; color: var(--text);
@@ -589,7 +592,7 @@ a.btn { text-decoration: none; display: inline-block; }
 .sunbox.night b { color: #9fb7ff; }
 .sunbox .hint { font: 11px var(--mono); }
 
-/* serwer vPANDORA nie odpowiada (okno run.bat zamknięte): jeden pasek u dołu ekranu (nie zasłania paska narzędzi zakładki),
+/* serwer PolIDS nie odpowiada (okno run.bat zamknięte): jeden pasek u dołu ekranu (nie zasłania paska narzędzi zakładki),
    znika po pierwszym udanym zapytaniu (api.js) */
 .srv-off { position: fixed; bottom: 8px; left: 50%; transform: translateX(-50%); z-index: 5000; max-width: calc(100vw - 24px);
   display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 12px; padding: 6px 14px; background: #1a0605; color: var(--text);

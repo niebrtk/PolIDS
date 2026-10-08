@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 
 import httpx
 
-os.environ.setdefault("VPANDORA_DATABASE_URL", "sqlite:///" + os.path.join(tempfile.mkdtemp(), "test.db").replace("\\", "/"))
+os.environ.setdefault("POLIDS_DATABASE_URL", "sqlite:///" + os.path.join(tempfile.mkdtemp(), "test.db").replace("\\", "/"))
 
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402

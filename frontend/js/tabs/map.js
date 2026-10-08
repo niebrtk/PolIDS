@@ -270,7 +270,7 @@ function mainMap(ctx) {
     const k = ctx.config.openaip_api_key;
     if (!k) {
       e.target.checked = false;
-      $(".openaip-note").textContent = "Brak klucza: załóż darmowe konto na openaip.net i wpisz VPANDORA_OPENAIP_API_KEY w pliku .env";
+      $(".openaip-note").textContent = "Brak klucza: załóż darmowe konto na openaip.net i wpisz POLIDS_OPENAIP_API_KEY w pliku .env";
       return;
     }
     if (e.target.checked) {

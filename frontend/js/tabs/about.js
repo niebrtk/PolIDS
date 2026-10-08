@@ -1,6 +1,7 @@
 import { api, esc, h } from "../api.js";
 
 const CHANGES = [
+  ["08.10.2026", "Nowa nazwa: PolIDS (Polish Integrated Display System), wcześniej vPANDORA. Nowe logo w menu i na tej stronie, ikona w karcie przeglądarki. Ustawienia z prefiksem POLIDS_; stare VPANDORA_ (np. klucz CARTO z setx) nadal działają."],
   ["07.10.2026", "Wersja 0.10.1. Dania (EKDK) też z własnego pliku .ese: sektory Kopenhagi, Bornholmu i FIS na MAP i w RADIO › GEO, kolejność przejmowania z ich pliku. Z pliku EPWW zostaje już tylko Białoruś."],
   ["07.10.2026", "Wersja 0.10.0. Sektory sąsiadów (Niemcy, Szwecja, Litwa, Czechy, Słowacja, Lwów, Kaliningrad) z ich własnych plików .ese: MAP rysuje je dokładnie na wybranym poziomie i koloruje wg tego, kto je obsługuje (kolejność przejmowania z ich plików), a RADIO › GEO pokazuje dokładny zasięg ich stanowisk. Z pakietu ukraińskiego bierzemy tylko Lwów, bez jego starych polskich sektorów. Sektory zależne od pasa w konfiguracji zachodniej."],
   ["07.10.2026", "Wersja 0.9.1. MAP: poprawiony kształt sektora UKLV (Lwów) – bez fałszywego trójkąta w środku; szare nazwy FIR-ów nie zasłaniają już częstotliwości sąsiada."],
@@ -49,7 +50,7 @@ export default {
   mount(root, ctx) {
     const pane = h(`<div class="pane about">
       <div class="about-head">
-        <div class="logo">vPANDORA<small>Integrated Air Traffic Management Display System · VATSIM PL vACC</small></div>
+        <div class="logo"><img src="/static/img/polids-logo.svg" alt="PolIDS – Polish Integrated Display System"><small>VATSIM PL vACC</small></div>
         <div class="card about-info"><h3>System</h3><dl class="props info"></dl></div>
       </div>
       <div class="about-tiles">${TILES.map(([tab, name, txt]) => `<button class="about-tile${tab === "emergency" ? " red" : ""}" data-open="${tab}"><b>${name}</b><span>${esc(txt)}</span></button>`).join("")}</div>

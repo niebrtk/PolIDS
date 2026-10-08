@@ -20,7 +20,7 @@ async def fetch_text(url: str, ttl: int, params: dict | None = None, headers: di
         return hit[1]
     try:
         async with httpx.AsyncClient(timeout=settings.http_timeout, follow_redirects=True,
-                                     headers={"User-Agent": "vPANDORA/0.1 (VATSIM PL vACC)", **(headers or {})}) as client:
+                                     headers={"User-Agent": "PolIDS/0.11 (VATSIM PL vACC)", **(headers or {})}) as client:
             resp = await client.get(url, params=params)
             resp.raise_for_status()
     except httpx.HTTPError as exc:

@@ -316,7 +316,7 @@ export function mountAwos(el, icao) {
     c.el.querySelector(".rwy").innerHTML = des ? `RWY <b>${esc(des)}</b> <span class="src">${src}</span>` : "brak pasa";
     c.el.querySelector(".aw-rsel").innerHTML = runwayPairs(st?.runways || []).map((g) => `<span class="aw-pair">${g.ends.map((e) =>
       `<button data-rwy="${esc(e.designator)}" class="${e.designator === des ? "sel" : ""} ${e.designator === def ? "use" : ""}"
-        title="${e.designator === def ? `pas w użyciu (${st?.runway_in_use?.source === "ATIS" ? "ATIS" : "sugestia vPANDORA"})` : "pokaż wiatr dla tego kierunku"}">${esc(e.designator)}</button>`).join("")}</span>`).join("");
+        title="${e.designator === def ? `pas w użyciu (${st?.runway_in_use?.source === "ATIS" ? "ATIS" : "sugestia PolIDS"})` : "pokaż wiatr dla tego kierunku"}">${esc(e.designator)}</button>`).join("")}</span>`).join("");
     c.stat.innerHTML = dialStatic(st?.runways || [], des);
     const rvr = (p?.rvr || []).filter((x) => x.runway === des);
     c.row.rvr.innerHTML = rvr.length ? rvr.map((x) => `R${esc(x.runway)} ${esc(rvrText(x))}`).join("<br>") : `<span class="dim">–</span>`;

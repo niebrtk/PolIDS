@@ -1,5 +1,5 @@
 @echo off
-REM Uruchomienie vPANDORA na Windows. Pierwsze uruchomienie tworzy srodowisko .venv i instaluje biblioteki.
+REM Uruchomienie PolIDS na Windows. Pierwsze uruchomienie tworzy srodowisko .venv i instaluje biblioteki.
 cd /d "%~dp0"
 if not exist .venv\Scripts\python.exe (
     echo Tworze srodowisko .venv ...

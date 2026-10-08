@@ -39,7 +39,7 @@ async def fetch_photo(icao: str, query: str) -> dict | None:
     params = {"action": "query", "format": "json", "generator": "search", "gsrsearch": f"{query} aircraft",
               "gsrlimit": 1, "prop": "pageimages|info", "piprop": "thumbnail", "pithumbsize": 800,
               "inprop": "url", "redirects": 1}
-    headers = {"User-Agent": "vPANDORA/0.3 (VATSIM PL vACC; aircraft type photos)"}
+    headers = {"User-Agent": "PolIDS/0.11 (VATSIM PL vACC; aircraft type photos)"}
     async with httpx.AsyncClient(timeout=settings.http_timeout, follow_redirects=True, headers=headers) as client:
         resp = await client.get(WIKI_API, params=params)
         resp.raise_for_status()
