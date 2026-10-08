@@ -30,7 +30,7 @@ from .http_cache import UpstreamError
 from .lvp import evaluate as evaluate_lvp
 from .metar import parse_metar
 from .notam import get_notams
-from .vatsim import controller_info, parse_atis
+from .vatsim import FACILITY_TYPES, controller_info, parse_atis
 from .weather import get_metars, get_tafs
 
 # Lotniska kontrolowane w FIR EPWW – ta sama lista co w podmenu AERODROME (frontend/js/tabs/aerodrome.js)
@@ -140,7 +140,7 @@ async def _weather(icaos: list[str]) -> tuple[dict, dict, list[str]]:
     async def one(fn, label):
         try:
             return await fn(icaos)
-        except (UpstreamError, ValueError) as exc:
+        except (UpstreamError, ValueError, KeyError, TypeError) as exc:   # Key/TypeError: inny kształt JSON z AWC
             errors.append(f"{label}: {exc}")
             return {}
 
@@ -167,7 +167,7 @@ def feed_info(feed: dict, icaos: list[str]) -> dict[str, dict]:
                 info["callsign"] += " / " + cs
                 info["letter"] = " / ".join(x for x in (info["letter"], c.get("atis_code")) if x)
                 info["lines"] += list(lines)
-        else:
+        elif cs.split("_")[-1] in FACILITY_TYPES:   # obserwator (EPWA_OBS) to nie stanowisko ATC
             out[icao]["atc"].append(controller_info(c))
     for p in feed.get("pilots", []):
         fp = p.get("flight_plan") or {}
@@ -207,12 +207,13 @@ async def _notams(icaos: list[str], now: datetime) -> dict:
         try:
             return icao, await get_notams(icao), None
         except (UpstreamError, ValueError) as exc:
-            return icao, None, f"{icao}: {exc}"
+            # UpstreamError zaczyna się od adresu z kodem lotniska: bez niego ten sam błąd skleja się w jedną linię
+            return icao, None, str(exc).split(": ", 1)[-1] if str(exc).startswith("http") else str(exc)
 
-    items, errors = [], []
+    items, errors = [], {}
     for icao, data, error in await asyncio.gather(*(one(i) for i in icaos)):
-        if error:
-            errors.append(error)
+        if error is not None:
+            errors.setdefault(error, []).append(icao)
             continue
         for n in data["notams"]:
             if notam_active(n, now):
@@ -220,7 +221,8 @@ async def _notams(icaos: list[str], now: datetime) -> dict:
                               "end": n.get("end"), "perm": n.get("perm"), "est": n.get("est"),
                               "schedule": n.get("schedule"), "raw": n.get("raw")})
     items.sort(key=lambda n: (n["icao"], n["id"] or ""))
-    return {"notams": items, "error": "Serwer NOTAM: " + "; ".join(errors) if errors else None}
+    error = "; ".join(f"{', '.join(ads)}: {msg}" for msg, ads in errors.items())
+    return {"notams": items, "error": f"Serwer NOTAM: {error}" if errors else None}
 
 
 def tv_restrictions(volumes, now: datetime) -> list[dict]:
@@ -259,7 +261,7 @@ async def _flow(airports: list[str], now: datetime) -> dict:
 
 def monitor_hours(buckets, now: datetime) -> dict:
     """Z całodobowych danych vIFF (/etfms/airports) bierzemy bieżącą i następną godzinę."""
-    rows = {str(b.get("hour")): b for b in buckets if isinstance(b, dict)}
+    rows = {str(b.get("hour")): b for b in (buckets if isinstance(buckets, list) else []) if isinstance(b, dict)}
     cur, nxt = rows.get(f"{now.hour:02d}"), rows.get(f"{(now.hour + 1) % 24:02d}")
     # jak w vIFF: 999 albo wartość ujemna = bez limitu
     cap = lambda b: (v if isinstance(v := (b or {}).get("entriesCapacity"), int) and 0 < v < 999 else None)  # noqa: E731
@@ -269,7 +271,8 @@ def monitor_hours(buckets, now: datetime) -> dict:
 
 def _delay(ctot: str | None, etot: str | None) -> int | None:
     """Opóźnienie ATFM w minutach: CTOT − ETOT (jak kolumna Delay w liście lotów NM)."""
-    if not (ctot and etot and ctot.isdigit() and etot.isdigit()):
+    ctot, etot = viff_service.hhmm(ctot), viff_service.hhmm(etot)   # '1621', '162100' albo liczba → '1621'
+    if not (ctot and etot):
         return None
     mins = lambda t: int(t[:2]) * 60 + int(t[2:])  # noqa: E731
     return (mins(ctot) - mins(etot) + 720) % 1440 - 720
@@ -294,8 +297,9 @@ async def _monitor(icaos: list[str], now: datetime) -> dict:
         if not isinstance(f, dict):
             continue
         dep, arr = str(f.get("departure") or "").upper(), str(f.get("arrival") or "").upper()
-        item = {"callsign": f.get("callsign"), "departure": dep, "arrival": arr, "ctot": f.get("ctot"),
-                "etot": f.get("etot"), "atot": f.get("atot"), "tto": f.get("tto"),
+        hm = viff_service.hhmm      # godziny zawsze jako 'HHMM' albo None (sortowanie po CTOT, opóźnienie)
+        item = {"callsign": f.get("callsign"), "departure": dep, "arrival": arr, "ctot": hm(f.get("ctot")),
+                "etot": hm(f.get("etot")), "atot": hm(f.get("atot")), "tto": hm(f.get("tto")),
                 "regulation": f.get("mostPenalisingRegulation") or None,
                 "delay": _delay(f.get("ctot"), f.get("etot")), "role": None}
         for icao, role in ((dep, "DEP"), (arr, "ARR")):
@@ -306,7 +310,7 @@ async def _monitor(icaos: list[str], now: datetime) -> dict:
         info = cdm.get(icao, {})
         regs = sorted(flights.get(icao, []), key=lambda f: (f["ctot"] or "9999", f["callsign"] or ""))
         delays = [f["delay"] for f in regs if f["delay"]]
-        out[icao] = {**monitor_hours((load or {}).get(icao) or [], now),
+        out[icao] = {**monitor_hours((load if isinstance(load, dict) else {}).get(icao), now),
                      "rate": info.get("rate"), "taxi_min": info.get("taxiTime"), "cdm": bool(info.get("isCdm")),
                      "config": info.get("config") or info.get("atis_config") or None,
                      "known": bool(info), "regulated": regs,

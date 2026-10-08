@@ -1,7 +1,6 @@
 /* METEO › QNH: mapa QNH regionalnego jak mapa rejonów QNH z AIP Polska (PAŻP: jasny podkład, siatka, zielone rejony,
    pomarańczowe pasy 15–17, liliowe TMA) i panel boczny w stylu NM UI. Napisy na mapie czytelne dzięki pełnemu tłu
-   etykiet, bez poświaty i cieni pod tekstem.
-   Stare reguły .qnhmap/.qnhside/.qnhnum/.qnhlabel ze style.css nie są już używane. */
+   etykiet, bez poświaty i cieni pod tekstem. */
 .qrwrap {
   --qr-paper: #fff;            /* podkład mapy */
   --qr-grid: #b9bdc2;          /* siatka 1° i kreski co 10′ */

@@ -166,7 +166,7 @@ async def measures(airports=(), now: datetime | None = None) -> dict:
             pass    # bez listy FIR-ów pokażemy numery zamiast kodów ICAO
         items = [measure(m, fir_ids, now) for m in raw if isinstance(m, dict)]
         return _result(items, ads, "ECFMP", None)
-    except (UpstreamError, ValueError, KeyError, TypeError) as exc:
+    except (UpstreamError, ValueError, KeyError, TypeError, AttributeError) as exc:   # Attribute: np. "measure" nie jako obiekt
         ecfmp_error = f"ECFMP niedostępny: {exc}"
     from . import viff as viff_service  # import tutaj, żeby nie robić zależności na starcie
     try:

@@ -1,6 +1,9 @@
 import { api, esc, h } from "../api.js";
 
 const CHANGES = [
+  ["08.10.2026", "Wersja 0.11.0. AERODROME › OVERVIEW: jeden ekran dla FIR EPWW z aktualnym TL, METAR wszystkich lotnisk ze stanem LVP, aktywnymi NOTAM-ami, restrykcjami ECFMP i vIFF oraz Airport Monitorem vIFF. Filtr stanowiska: APP lub ACC zawęża lotniska (np. EPWA_APP: EPWA, EPMO, EPLL, EPRA) i pokazuje checklistę otwarcia, TWR przenosi do PRZEGLĄDU lotniska."],
+  ["08.10.2026", "RADIO: nowa zakładka EDUU/EDYY; u sąsiadów prawdziwe callsigny radiowe z nazwami sektorów (VATSIM Germany Knowledgebase, LOA); pasek LOA z tabelami przekazań, zasadami i PDF-em; przyciski szybkiego skoku we wszystkich FIR-ach; lotniska VFR bez ID. DOCS: nowa kategoria LOA."],
+  ["08.10.2026", "METEO › QNH: nowy podkład jak mapa rejonów QNH z AIP Polska (PAŻP), rejony odrysowane na nowo, pasy awaryjne 15–17 na 53°N i 51°N. AWOS: wiatr co 5 s z płynną wskazówką, RVR z METAR, „>2000 M” albo symulacja przy słabej widzialności. MAP: ATIS linia po linii, dane kontrolera po najechaniu na plakietkę lub opis stanowiska (także ESGG GND), lista sąsiednich FIR-ów domyślnie zwinięta."],
   ["08.10.2026", "Nowa nazwa: PolIDS (Polish Integrated Display System), wcześniej vPANDORA. Nowe logo w menu i na tej stronie, ikona w karcie przeglądarki. Ustawienia z prefiksem POLIDS_; stare VPANDORA_ (np. klucz CARTO z setx) nadal działają."],
   ["07.10.2026", "Wersja 0.10.1. Dania (EKDK) też z własnego pliku .ese: sektory Kopenhagi, Bornholmu i FIS na MAP i w RADIO › GEO, kolejność przejmowania z ich pliku. Z pliku EPWW zostaje już tylko Białoruś."],
   ["07.10.2026", "Wersja 0.10.0. Sektory sąsiadów (Niemcy, Szwecja, Litwa, Czechy, Słowacja, Lwów, Kaliningrad) z ich własnych plików .ese: MAP rysuje je dokładnie na wybranym poziomie i koloruje wg tego, kto je obsługuje (kolejność przejmowania z ich plików), a RADIO › GEO pokazuje dokładny zasięg ich stanowisk. Z pakietu ukraińskiego bierzemy tylko Lwów, bez jego starych polskich sektorów. Sektory zależne od pasa w konfiguracji zachodniej."],
@@ -66,7 +69,7 @@ export default {
       const st = await api("/api/status").catch(() => ({ counts: {} }));
       const c = st.counts;
       const row = (k, v) => `<dt>${k}</dt><dd>${v}</dd>`;
-      pane.querySelector(".info").innerHTML = row("Wersja", "0.10.1")
+      pane.querySelector(".info").innerHTML = row("Wersja", "0.11.0")
         + row("Cykl AIRAC", `${esc(ctx.config.airac.ident)} (od ${esc(ctx.config.airac.effective)})`)
         + row("Dane", `${c.aerodromes ?? "–"} lotnisk, ${c.aircraft_types ?? "–"} typów samolotów, ${c.callsigns ?? "–"} callsignów`)
         + row("Nawigacja", `${c.nav_points ?? "–"} punktów, ${c.airway_segments ?? "–"} odcinków dróg, ${c.sectors ?? "–"} sektorów, ${c.atc_positions ?? "–"} stanowisk ATC`)

@@ -476,7 +476,12 @@ export default {
       $(".title").textContent = "OVERVIEW · FIR EPWW";
       $(".upd").textContent = "";
       $(".content").innerHTML = "";
-      ov = mountOverview($(".content"), { onGoto: (code) => go(code) });
+      // wieża wybrana w filtrze: zawsze PRZEGLĄD lotniska, także gdy ostatnio był otwarty AWOS albo RUCH
+      ov = mountOverview($(".content"), { onGoto: (code) => {
+        view = "overview";
+        lsSet("aerodrome.view", view);
+        go(code);
+      } });
     };
 
     const go = (code) => {

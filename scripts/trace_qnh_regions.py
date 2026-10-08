@@ -14,10 +14,10 @@ funkcja trace_tma) zapisywane jako 'aip' przy TMA; bez --image dotychczasowe 'ai
 
 Użycie (z katalogu głównego repozytorium):
     python scripts/trace_qnh_regions.py                          # zapis rejonów i FIR do data/seed/qnh_regions.json
-    python scripts/trace_qnh_regions.py --image qnh_pansa.png --overlay kontrola.png
+    python scripts/trace_qnh_regions.py --image data/import/qnh_pansa.png --overlay kontrola.png
                                                                  # jak wyżej + obszary TMA "BELOW … QNH FROM" ze zrzutu
                                                                  # ('aip' w "tmas") i nakładka granic na zrzucie
-    python scripts/trace_qnh_regions.py --image qnh_pansa.png --fit
+    python scripts/trace_qnh_regions.py --image data/import/qnh_pansa.png --fit
                                                                  # ponowne dopasowanie odwzorowania do siatki zrzutu
 
 Wymaga: numpy i shapely, dla --image także Pillow (pip install numpy shapely pillow).

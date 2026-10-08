@@ -3,6 +3,7 @@ import csv
 import json
 import os
 import tempfile
+from types import SimpleNamespace
 
 os.environ.setdefault("POLIDS_DATABASE_URL",
                       "sqlite:///" + os.path.join(tempfile.mkdtemp(), "test.db").replace("\\", "/"))
@@ -195,6 +196,14 @@ def test_tma_geometry_fallback():
     aip = {"type": "MultiPolygon", "coordinates": [[[[20, 52], [21, 52], [21, 53], [20, 52]]]]}
     out = meteo._tma_geometry({"icao": "EPXX", "aip": aip}, [])
     assert out["area"] == aip and out["layers"] is None
+    # warstwa .ese (sektor o nazwie z prefiksem "ese"): bez "aip" jest obszarem, z "aip" cienkimi liniami w środku
+    ring = [[20.5, 52.2], [20.8, 52.2], [20.8, 52.6], [20.5, 52.2]]
+    sec = SimpleNamespace(name="EPXX_TMA_A", geometry=json.dumps({"type": "Polygon", "coordinates": [ring]}))
+    other = SimpleNamespace(name="EPYY_TMA_A", geometry=sec.geometry)
+    out = meteo._tma_geometry({"icao": "EPXX", "ese": ["EPXX_TMA_"]}, [sec, other])
+    assert out == {"area": {"type": "MultiPolygon", "coordinates": [[ring]]}, "layers": None, "outline": None}
+    out = meteo._tma_geometry({"icao": "EPXX", "ese": ["EPXX_TMA_"], "aip": aip}, [sec, other])
+    assert out == {"area": aip, "layers": {"type": "MultiPolygon", "coordinates": [[ring]]}, "outline": None}
 
 
 def test_endpoint_without_metar(client, monkeypatch):

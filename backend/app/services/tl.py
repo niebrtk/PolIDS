@@ -1,6 +1,6 @@
 """Poziom przejściowy (TL) i wysokość przejściowa (TA) w FIR EPWW.
 
-Wysokość przejściowa w FIR EPWW to 6500 ft (AIP Polska ENR 1.7, tak samo OM PL vACC).
+Wysokość przejściowa w FIR EPWW to 6500 ft (OM PL vACC; w eAIP PAŻP ENR 1.7 nie dało się tego sprawdzić z serwera).
 
 Zasada wyznaczania poziomu przejściowego (OM PL vACC, om.plvacc.pl/docs/2610/airspace, rozdział
 "Airspace structure" → "Transition level", AIRAC 2610, sprawdzone 2026-10-08):

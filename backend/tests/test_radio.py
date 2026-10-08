@@ -186,6 +186,7 @@ def test_radio_names_priority():
           {"callsign": "LKAA_W_CTR", "prefix": "LKAA", "facility": "CTR", "name": "Praha Radar"},
           {"callsign": "LKAA_WU_CTR", "prefix": "LKAA", "facility": "CTR", "name": None},
           {"callsign": "LKAA_I_CTR", "prefix": "LKAA", "facility": "CTR", "name": None},
+          {"callsign": "LKAA_FIC_FSS", "prefix": "LKAA", "facility": "FSS", "name": "Praha Information"},
           {"callsign": "LKPR_TWR", "prefix": "LKPR", "facility": "TWR", "name": None},
           {"callsign": "EPSC_TWR", "prefix": "EPSC", "facility": "TWR", "name": "Szczecin Tower"}]
     out = {p["callsign"]: p for p in radio_names(ps, kb, loa)}
@@ -197,7 +198,9 @@ def test_radio_names_priority():
     assert (u["radio"], u["radio_src"], u["sector"], u["sector_src"]) == ("Praha Radar", "loa", "NU / SU", "loa")
     assert u["loa"]["notes"] == ["FL305-FL660"]
     assert (out["LKAA_W_CTR"]["radio"], out["LKAA_W_CTR"]["radio_src"], out["LKAA_W_CTR"]["sector"]) == ("Praha Radar", "ese", None)
+    # "Praha Information" (LKAA_FIC_FSS) nie blokuje znaku "Praha Radar" pozostałym stanowiskom LKAA
     assert (out["LKAA_WU_CTR"]["radio"], out["LKAA_WU_CTR"]["radio_src"]) == ("Praha Radar", "prefix")
+    assert (out["LKAA_FIC_FSS"]["radio"], out["LKAA_FIC_FSS"]["radio_src"]) == ("Praha Information", "ese")
     assert out["LKAA_I_CTR"]["radio"] is None and out["LKPR_TWR"]["radio"] is None  # informacja / lotnisko: bez zgadywania
     ep = out["EPSC_TWR"]  # Polska: bez zmian (nazwa z pliku .ese)
     assert ep["radio"] is None and ep["sector"] is None and ep["name"] == "Szczecin Tower"
@@ -234,6 +237,7 @@ def test_radio_positions_names_and_tabs(client):
     # LOA: sektor czeski, znak radiowy z LOA albo pliku .ese
     assert ps["LKAA_N_CTR"]["radio"] == "Praha Radar" and ps["LKAA_N_CTR"]["sector"] == "NL"
     assert ps["LKAA_N_CTR"]["sector_src"] == "loa" and ps["LKAA_N_CTR"]["nb_tab"] == "LKAA"
+    assert (ps["LKAA_WU_CTR"]["radio"], ps["LKAA_WU_CTR"]["radio_src"]) == ("Praha Radar", "prefix")
     assert ps["EPWA_APP"]["nb_tab"] is None and ps["EPWA_APP"]["radio"] is None
     assert ps["EURN_FSS"]["nb_tab"] == "INNE"
 

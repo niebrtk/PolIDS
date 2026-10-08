@@ -19,7 +19,7 @@ async def lifespan(_app: FastAPI):
     yield
 
 
-app = FastAPI(title="PolIDS API", version="0.10.1", lifespan=lifespan,
+app = FastAPI(title="PolIDS API", version="0.11.0", lifespan=lifespan,
               description="API aplikacji PolIDS – Polish Integrated Display System (VATSIM PL vACC). Dokumentacja interaktywna: /docs")
 
 for r in (system, meteo, aerodromes, overview, notam, aircraft, callsigns, nav, radio, vatsim, viff, docs):

@@ -231,7 +231,10 @@ def neighbour_tab(p: dict) -> str | None:
 
 
 # --- znaki radiowe i nazwy sektorów stanowisk sąsiadów
-INFO_MID = {"I", "FIS", "IN", "INFO"}  # środek znaku stanowiska informacji (EKDK_I_CTR): bez znaku "… Control"
+# środek znaku stanowiska informacji (EKDK_I_CTR, LKAA_FIC_FSS): bez znaku "… Control" i nie wyznacza go innym
+INFO_MID = {"I", "FIS", "FIC", "IN", "INFO"}
+
+
 def _kb_index(names_de: dict) -> dict[str, dict]:
     """names_de.json (positions): login → wpis, także loginy zastępcze (aliases: EDWW_MR1_CTR → EDWW_MRZ_CTR)."""
     out: dict[str, dict] = {}
@@ -264,14 +267,17 @@ def _loa_index(loa_firs: dict) -> dict[str, dict]:
 
 
 def _nb_acc(p: dict) -> bool:
-    return p.get("facility") in ("CTR", "FSS") and not p["callsign"].upper().startswith("EP")
+    """Stanowisko ACC sąsiada (CTR/FSS) bez stanowisk informacji."""
+    cs = p["callsign"].upper()
+    return p.get("facility") in ("CTR", "FSS") and not cs.startswith("EP") and not INFO_MID & set(cs.split("_")[1:-1])
 
 
 def radio_names(positions: list[dict], names_de: dict, loa_firs: dict) -> list[dict]:
     """Znak radiowy (`radio`) i nazwa sektora (`sector`) stanowisk sąsiadów, z pierwszeństwem: baza wiedzy VATSIM
     Germany (names_de.json), LOA (loa.json, stanowiska sąsiada), nazwa z pliku .ese (tylko znak radiowy).
     Stanowisko ACC (CTR/FSS) bez żadnej nazwy dostaje znak radiowy pozostałych stanowisk CTR/FSS z tym samym prefiksem,
-    gdy wszystkie mają ten sam (ESOS_7_CTR → Sweden Control; bez stanowisk informacji: _I_, _FIS_, _IN_, _INFO_).
+    gdy wszystkie mają ten sam (ESOS_7_CTR → Sweden Control). Stanowiska informacji (_I_, _FIS_, _FIC_, _IN_, _INFO_)
+    w tym nie biorą udziału: ani nie dostają znaku, ani ich "… Information" nie blokuje znaku pozostałym (LKAA_WU_CTR).
     `radio_src` / `sector_src`: kb | loa | ese | prefix | None; `kb` i `loa`: szczegóły do dymku (zakres, uwagi).
     Stanowiska polskie (EP**) zostają z nazwą z pliku .ese (pola puste)."""
     kb, loa = _kb_index(names_de), _loa_index(loa_firs)
@@ -301,6 +307,6 @@ def radio_names(positions: list[dict], names_de: dict, loa_firs: dict) -> list[d
             same.setdefault(p.get("prefix"), set()).add(p["radio"])
     for p in positions:
         names = same.get(p.get("prefix")) or set()
-        if _nb_acc(p) and not p["radio"] and len(names) == 1 and not INFO_MID & set(p["callsign"].upper().split("_")[1:-1]):
+        if _nb_acc(p) and not p["radio"] and len(names) == 1:
             p.update(radio=next(iter(names)), radio_src="prefix")
     return positions

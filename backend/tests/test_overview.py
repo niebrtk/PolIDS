@@ -137,7 +137,8 @@ def test_ecfmp_zapas_z_viff(monkeypatch):
 
 def test_feed_info_liczy_ruch_i_skleja_atis():
     feed = {"controllers": [{"callsign": "EPWA_TWR", "frequency": "118.305", "name": "Ola", "cid": 1},
-                            {"callsign": "EDDB_TWR", "frequency": "120.030", "name": "Hans", "cid": 2}],
+                            {"callsign": "EDDB_TWR", "frequency": "120.030", "name": "Hans", "cid": 2},
+                            {"callsign": "EPWA_OBS", "frequency": "199.998", "name": "Gość", "cid": 3}],
             "atis": [{"callsign": "EPWA_A_ATIS", "atis_code": "K", "text_atis": ["ARR 33", "TRANSITION LEVEL 80"]},
                      {"callsign": "EPWA_D_ATIS", "atis_code": "L", "text_atis": ["DEP 29"]}],
             "pilots": [{"flight_plan": {"departure": "EPWA", "arrival": "EPKK"}},
@@ -149,7 +150,8 @@ def test_feed_info_liczy_ruch_i_skleja_atis():
     assert (info["EPWA"]["departures"], info["EPWA"]["arrivals"], info["EPWA"]["prefiles"]) == (2, 1, 1)
     assert (info["EPKK"]["departures"], info["EPKK"]["arrivals"]) == (1, 1)
     assert info["EPWA"]["atis"]["letter"] == "K / L" and len(info["EPWA"]["atis"]["lines"]) == 3
-    assert [c["callsign"] for c in info["EPWA"]["atc"]] == ["EPWA_TWR"]   # EDDB_TWR to nie nasze lotnisko
+    # EDDB_TWR to nie nasze lotnisko, a EPWA_OBS to obserwator, nie stanowisko ATC
+    assert [c["callsign"] for c in info["EPWA"]["atc"]] == ["EPWA_TWR"]
 
 
 def test_notam_aktywne_teraz():
@@ -185,6 +187,11 @@ def test_monitor_godziny_i_opoznienie():
     assert overview.monitor_hours([], NOW)["now"] == {"entries": None, "cap": None}
     assert overview._delay("1621", "1609") == 12 and overview._delay("0010", "2350") == 20
     assert overview._delay("", "1609") is None and overview._delay(None, None) is None
+    # vIFF podaje też godziny z sekundami albo jako liczbę
+    assert overview._delay("162100", "160900") == 12 and overview._delay(1621, 1609) == 12
+    # inny kształt danych niż lista godzin: puste wartości zamiast błędu
+    assert overview.monitor_hours({"15": {}}, NOW)["now"] == {"entries": None, "cap": None}
+    assert overview.monitor_hours(None, NOW)["next"] == {"entries": None, "cap": None}
 
 
 # --- całe zapytanie /api/overview (z bazą zbudowaną z plików .ese) -----------------------------------------------
@@ -286,6 +293,10 @@ def test_overview_filtr_stanowiska(client):
     assert [a["icao"] for a in d["aerodromes"]] == ["EPLL", "EPMO", "EPRA", "EPWA"]
     # poziom przejściowy liczymy z QNH wszystkich lotnisk FIR-u, nie tylko pokazanych
     assert d["tl"]["fir"]["stations"] == 2 and set(d["tl"]["aerodromes"]) == set(overview.AERODROMES)
+    # filtr bez METAR-ów (EPKK, EPKT, EPRZ): poziom przejściowy i tak z QNH EPWA/EPMO spoza filtra
+    kk = client.get("/api/overview?position=EPKK_APP").json()
+    assert kk["airports"] == ["EPKK", "EPKT", "EPRZ"]
+    assert (kk["tl"]["fir"]["fl"], kk["tl"]["fir"]["qnh_icao"], kk["tl"]["fir"]["stations"]) == (80, "EPWA", 2)
     # wieża: zamiast filtra podpowiedź skoku do PRZEGLĄDU lotniska
     twr = client.get("/api/overview?position=EPKK_TWR").json()
     assert twr["position"]["goto"] == "EPKK" and twr["airports"] == ["EPKK"]
@@ -318,3 +329,43 @@ def test_overview_awaria_zrodel(client, monkeypatch):
     wa = next(a for a in d["aerodromes"] if a["icao"] == "EPWA")
     assert wa["tl"]["source"] == "ATIS" and wa["tl"]["fl"] == 80
     assert [n["id"] for n in d["notams"]] == ["A1234/26"]
+
+
+def test_overview_awaria_notam_vatsim_taf(client, monkeypatch):
+    """Awaria serwera NOTAM, data feedu VATSIM i TAF-ów: odpowiedź 200, komunikaty po polsku, jeden błąd NOTAM
+    dla wszystkich lotnisk zamiast osobnej linii na każde."""
+    async def boom_notam(icao):
+        raise UpstreamError(f"https://cv.plvacc.pl/notam/get-icao-format?icao={icao}&read=true: timeout")
+
+    async def boom_feed():
+        raise UpstreamError("https://data.vatsim.net/v3/vatsim-data.json: timeout")
+
+    async def bad_taf(icaos):
+        raise KeyError("icaoId")          # AWC zwróciło JSON w innym kształcie
+
+    monkeypatch.setattr(overview, "get_notams", boom_notam)
+    monkeypatch.setattr(vatsim_api, "get_feed", boom_feed)
+    monkeypatch.setattr(overview, "get_tafs", bad_taf)
+    r = client.get("/api/overview?position=EPWA_APP")
+    assert r.status_code == 200
+    d = r.json()
+    assert d["notams"] == [] and d["notam_error"] == "Serwer NOTAM: EPLL, EPMO, EPRA, EPWA: timeout"
+    assert "VATSIM" in d["network_error"] and "TAF" in d["wx_error"]
+    wa = next(a for a in d["aerodromes"] if a["icao"] == "EPWA")
+    assert wa["atis"] is None and wa["tl"]["source"] == "QNH" and wa["metar"] and wa["taf"] is None
+
+
+def test_overview_viff_inny_ksztalt(client, monkeypatch):
+    """vIFF zwraca dane w nieoczekiwanym kształcie (lista zamiast słownika, godziny jako liczby): bez błędu 500."""
+    async def odd_viff(path, params=None, ttl=None):
+        return {"/etfms/airports": [{"EPWA": 1}], "/etfms/getCadAirports": {"error": "x"},
+                "/etfms/restricted": [{"callsign": "LOT1", "departure": "EPWA", "arrival": "EPGD", "ctot": 1621,
+                                       "etot": 1609}, "śmieci"],
+                "/etfms/trafficVolumes": {"error": "x"}}[path]
+
+    monkeypatch.setattr(viff, "_get", odd_viff)
+    r = client.get("/api/overview?position=EPWA_APP")
+    assert r.status_code == 200
+    wa = next(a for a in r.json()["aerodromes"] if a["icao"] == "EPWA")["monitor"]
+    assert wa["now"] == {"entries": None, "cap": None} and wa["rate"] is None
+    assert wa["regulated"][0]["ctot"] == "1621" and wa["regulated"][0]["delay"] == 12

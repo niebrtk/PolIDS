@@ -195,12 +195,19 @@ function listView(build, { wide = false, goto, nb } = {}) {
       body.classList.toggle("vacs", wide && !!vacs);
       const top = pane.scrollTop;
       const loaTop = loaEl?.querySelector(".loa-b")?.scrollTop || 0;
+      // fokus w panelu LOA (filtr, pasek): przeniesienie panelu go zdejmuje, więc wraca na to samo pole i miejsce kursora
+      const foc = loaEl?.contains(document.activeElement) ? document.activeElement : null;
+      const sel = foc?.matches("input") ? [foc.selectionStart, foc.selectionEnd] : null;
       body.innerHTML = build(ps);
       const slot = body.querySelector(".loa-slot");
       if (slot && loaEl) {
         slot.replaceWith(loaEl);
         const lb = loaEl.querySelector(".loa-b");
         if (lb) lb.scrollTop = loaTop;
+        if (foc) {
+          foc.focus({ preventScroll: true });
+          if (sel) foc.setSelectionRange(...sel);
+        }
       }
       const byCs = Object.fromEntries(ps.map((p) => [p.callsign, p]));
       // szerokość kolumny ID tylko z wierszy, które ją mają (lotniska VFR są bez ID)
@@ -214,7 +221,10 @@ function listView(build, { wide = false, goto, nb } = {}) {
       nb?.loa ? R.loadLoa().catch((e) => ({ error: e.message })) : null])
       .then(([p, n, v, s, o, , l]) => {
         ps = p; names = n; vacs = v; sectors = s; own = o;
-        if (nb) loaEl = loaPanel(nb, l, ps);
+        // uszkodzony wpis w loa.json: komunikat w pasku LOA, lista stanowisk zostaje
+        if (nb) {
+          try { loaEl = loaPanel(nb, l, ps); } catch (e) { loaEl = loaPanel(nb, { error: `LOA: błędny wpis ${nb.loa} w data/seed/loa.json (${e.message})` }, ps); }
+        }
         draw();
       })
       .catch((e) => { err = e.message; draw(); });
@@ -244,8 +254,9 @@ function listView(build, { wide = false, goto, nb } = {}) {
 // Pasek przycisków na górze listy: kliknięcie przewija do grupy (lotniska, FIR-u); zielony = ktoś jest online,
 // pomarańczowy = rezerwacja. kinds: [{short, g: [[nazwa grupy, stanowiska]], tip(nazwa, stanowiska)}]
 const grpState = (ps) => (ps.some((p) => st.online[p.callsign]) ? "on" : ps.some((p) => st.bookings[p.callsign]?.length) ? "booked" : "");
-const jumpBar = (kinds) => `<div class="ad-jump">${kinds.filter((k) => k.g.length).map((k) => `<span class="aj-kind">${k.short}</span>${k.g.map(([key, ps]) =>
-  `<button data-jump="${esc(key)}" class="${grpState(ps)}" title="${esc(k.tip(key, ps))}">${esc(key)}</button>`).join("")}`).join("")}</div>`;
+// bez żadnej grupy (pusta lista) bez paska
+const jumpBar = (kinds) => (kinds.some((k) => k.g.length) ? `<div class="ad-jump">${kinds.filter((k) => k.g.length).map((k) => `<span class="aj-kind">${k.short}</span>${k.g.map(([key, ps]) =>
+  `<button data-jump="${esc(key)}" class="${grpState(ps)}" title="${esc(k.tip(key, ps))}">${esc(key)}</button>`).join("")}`).join("")}</div>` : "");
 // sąsiedzi i INNE: najpierw grupy ze stanowiskami ACC/CTR (jak kolejność listy), potem lotniska
 const nbJump = (groups) => {
   const fir = (k, ps) => ps.find((p) => p.fir_name)?.fir_name || R.FIR_COLORS[R.firKey(ps[0]?.callsign, ps[0]?.fir)]?.name || "";
@@ -274,7 +285,8 @@ function loaTransfers(rows, from, to) {
   // kolumny sektorów tylko, gdy LOA je podaje (LKAA, LZBB: bez sektorów)
   const sec = rows.some((t) => t.from || t.to);
   const head = `<tr><th>Ruch</th><th>COP</th><th>Poziom</th>${sec ? "<th>Z sektora</th><th>Do sektora</th>" : ""}<th>Warunki</th></tr>`;
-  const body = rows.map((t) => `<tr data-f="${esc(Object.values(t).join(" ").toLowerCase())}"><td class="trf">${esc(t.traffic)}</td>
+  // filtr po treści wiersza bez pola dir ("out"/"in" pasowałoby do każdego przekazania w tę stronę)
+  const body = rows.map((t) => `<tr data-f="${esc(Object.entries(t).filter(([k]) => k !== "dir").map(([, v]) => v).join(" ").toLowerCase())}"><td class="trf">${esc(t.traffic)}</td>
     <td class="cop">${esc(t.cop)}</td><td class="lvl${t.level?.length > 18 ? " wrap" : ""}">${esc(t.level)}</td>${sec ? `<td>${esc(t.from)}</td><td>${esc(t.to)}</td>` : ""}
     <td class="cond">${esc(t.conditions)}</td></tr>`).join("");
   return `<div class="loa-sec"><h4>${esc(from)} → ${esc(to)} <small>${rows.length}</small></h4>
@@ -324,7 +336,8 @@ function loaPanel(nb, d, ps) {
   };
   toggle(lsGet(LS_LOA + nb.loa) === "1", false);
   hd.addEventListener("click", (e) => { if (!e.target.closest("a")) toggle(); });
-  hd.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); } });
+  // Enter / spacja tylko na samym pasku: na linku PDF Enter ma otworzyć PDF, nie zwijać panelu
+  hd.addEventListener("keydown", (e) => { if (e.target === hd && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); toggle(); } });
   // filtr: wiersze tabel i zasady zawierające wpisany tekst; sekcje bez trafień znikają
   const q = el.querySelector(".loa-q"), cnt = el.querySelector(".loa-cnt");
   q.addEventListener("input", () => {

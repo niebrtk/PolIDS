@@ -328,7 +328,9 @@ function mainMap(ctx) {
     if (!el || !m.isTooltipOpen()) return;
     const p = map.latLngToContainerPoint(m.getLatLng()), { x: W, y: H } = map.getSize(), w = el.offsetWidth, hh = el.offsetHeight;
     const down = p.y - hh - 16 < 0 && H - p.y > p.y;
-    const dx = Math.round(Math.max(4 - (p.x - w / 2), Math.min(0, W - 4 - (p.x + w / 2))));
+    // z lewej nie pod przyciskami zoomu (+/−), które przykrywały nazwę lotniska w karcie (ESGG przy górnej krawędzi)
+    const zc = map.zoomControl?.getContainer(), x0 = zc ? zc.offsetLeft + zc.offsetWidth + 4 : 4;
+    const dx = Math.round(Math.max(x0 - (p.x - w / 2), Math.min(0, W - 4 - (p.x + w / 2))));
     const dir = down ? "bottom" : "top", off = [dx, down ? 30 : -8];
     el.classList.toggle("adc-shift", dx !== 0);
     if (tt.options.direction === dir && String(tt.options.offset) === String(off)) return;
@@ -696,7 +698,7 @@ function mainMap(ctx) {
       const pr = f.properties;
       let it = m.get(pr.key);
       if (!it) {
-        it = { key: pr.key, lo: pr.lower_ft, hi: pr.upper_ft, here: false, on: new Set(),
+        it = { key: pr.key, lo: pr.lower_ft, hi: pr.upper_ft, here: false, on: new Set(), who: "",
           head: id === "nb" ? pr.group_label : id === "oth" ? OTH_HEAD[pr.kind] : "",
           label: id === "nb" ? pr.label : pr.group_label, sub: ["tma", "ctr"].includes(id) ? pr.group : "" };
         m.set(pr.key, it);
@@ -705,7 +707,8 @@ function mainMap(ctx) {
       it.hi = Math.max(it.hi, pr.upper_ft);
       it.here ||= atLevel(pr, lv);
       const cs = onl && (pr.owner_callsigns || []).find((x) => onl[x]);
-      if (cs) it.on.add(displayName(onl[cs].callsign));
+      // who: imię i nazwisko kontrolera, tylko do wyszukiwania na liście
+      if (cs) { it.on.add(displayName(onl[cs].callsign)); it.who += ` ${onl[cs].name || ""}`; }
     });
     return [...m.values()].sort((a, b) => a.head.localeCompare(b.head, "pl") || a.label.localeCompare(b.label, "pl", { numeric: true }));
   };
@@ -741,7 +744,7 @@ function mainMap(ctx) {
     el.innerHTML = `<div class="pk-bar">${items.length > 12 ? `<input class="field pk-q" placeholder="szukaj…" value="${esc(q)}">` : ""}
         <button data-pk="all">wszystkie</button><button data-pk="none">żaden</button></div>
       <div class="pk-list">${!items.length ? `<div class="pk-none">${sliceErr ? esc(sliceErr) : "brak sektorów w pliku .ese"}</div>` : [...groups].map(([head, its]) => {
-        const vis2 = its.filter((it) => !q || `${it.label} ${it.sub} ${it.key} ${head} ${[...it.on].join(" ")}`.toLowerCase().includes(q));
+        const vis2 = its.filter((it) => !q || `${it.label} ${it.sub} ${it.key} ${head} ${[...it.on].join(" ")}${it.who}`.toLowerCase().includes(q));
         if (!vis2.length) return "";
         const n = its.filter((it) => has(it.key)).length;
         const box = `<input type="checkbox" data-g="${esc(head)}" ${n === its.length ? "checked" : ""} ${n && n < its.length ? 'data-mixed="1"' : ""}>`;
@@ -1008,8 +1011,10 @@ function mainMap(ctx) {
   // --- kontrolerzy online: plakietki lotnisk (D/G/T/A/APP) jak w VATSIM Radar; CTR rysuje drawFirs
   // Plakietki: lotniska w FIR EPWW ze wszystkimi stanowiskami; u sąsiadów mniejsza, szara plakietka (np. "ESGG G"),
   // gdy jest tam kontroler (DEL / GND / TWR / APP): sam ATIS bez kontrolera pomijamy, żeby nie zaśmiecać mapy.
+  // Sąsiedzi tylko w obszarze wokół Polski (ten sam co samoloty), a nie z całego świata.
   const isEp = (icao) => icao.startsWith("EP");
-  const badgeFacilities = (ap) => (isEp(ap.icao) || FACILITIES.some(([k]) => k !== "ATIS" && ap.facilities[k]) ? ap.facilities : null);
+  const nearPl = (ap) => ap.lat >= 44 && ap.lat <= 60 && ap.lon >= 5 && ap.lon <= 35;
+  const badgeFacilities = (ap) => (isEp(ap.icao) || (nearPl(ap) && FACILITIES.some(([k]) => k !== "ATIS" && ap.facilities[k])) ? ap.facilities : null);
   const loadAtc = async () => {
     layers.atc.clearLayers();
     try {

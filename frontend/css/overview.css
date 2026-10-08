@@ -95,6 +95,7 @@
 /* --- Airport Monitor vIFF */
 .ov-mon-tab td.ic { text-align: left; }
 .ov-mon-body table.data th { font-size: 10px; }
+.ov-mon-body td.tip, .ov-mon-body [title] { cursor: help; }
 
 /* --- checklista otwarcia stanowiska */
 .ov-chk-pos { margin-bottom: 2px; font: 700 13px var(--mono); color: var(--green-hi); }

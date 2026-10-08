@@ -80,8 +80,10 @@ const QR_LAYERS = [["tma", "TMA/MTMA"], ["ad", "lotniska"], ["cap", "opisy BELOW
 const QR_ZOOM = 7.5, QR_FAR = 7.0;
 
 // odwzorowanie stożkowe wiernokątne Lamberta (kula) jak na mapie AIP: południk środkowy 19°E, stała stożka 0,798
-// (styczne na ok. 53°N, wartość dopasowana do siatki mapy PAŻP); skala jak w EPSG:3857 (256 px na obwód przy zoomie 0)
-const QR_CRS = (() => {
+// (styczne na ok. 53°N, wartość dopasowana do siatki mapy PAŻP); skala jak w EPSG:3857 (256 px na obwód przy zoomie 0).
+// Tworzone dopiero przy otwarciu mapy: moduł importują też awos.js i overview.js, a w testach Node nie ma Leafleta (L).
+let qrCrs = null;
+const lccCrs = () => qrCrs || (qrCrs = (() => {
   const R = 6378137, d = Math.PI / 180, n = 0.798, l0 = 19 * d;
   const tn = (lat) => Math.tan(Math.PI / 4 + lat / 2) ** n;
   const F = Math.cos(Math.asin(n)) * tn(Math.asin(n)) / n, r0 = R * F / tn(52 * d);
@@ -98,7 +100,7 @@ const QR_CRS = (() => {
   };
   const s = 0.5 / (Math.PI * R);
   return L.extend({}, L.CRS.Earth, { code: "PolIDS:LCC", projection, transformation: new L.Transformation(s, 0.5, -s, 0.5) });
-})();
+})());
 
 function qnhMap(pane) {
   const wrap = h(`<div class="qrwrap"><div class="qrmapbox"><div class="map qrmap"></div><div class="qr-grat"></div></div>
@@ -112,7 +114,9 @@ function qnhMap(pane) {
     </div></div>`);
   pane.append(wrap);
   const $ = (s) => wrap.querySelector(s);
-  const map = L.map($(".qrmap"), { crs: QR_CRS, zoomSnap: 0.1, zoomDelta: 0.5, wheelPxPerZoomLevel: 120, attributionControl: false });
+  // minZoom: dalej FIR to kilka pikseli, a etykiety (nie mniejsze niż 86%) zlewają się w jeden stos
+  const map = L.map($(".qrmap"), { crs: lccCrs(), minZoom: 5.5, zoomSnap: 0.1, zoomDelta: 0.5, wheelPxPerZoomLevel: 120,
+    attributionControl: false });
   // kolejność warstw jak na mapie AIP: siatka, TMA, pasy 15–17, granice rejonów, FIR, numery, lotniska, opisy, etykiety
   [["qgrid", 330], ["qtma", 340], ["qband", 345], ["qreg", 350], ["qfir", 360], ["qnum", 560], ["qad", 600], ["qcap", 620], ["qlbl", 640]]
     .forEach(([n, z]) => { map.createPane(n).style.zIndex = z; });
@@ -142,9 +146,11 @@ function qnhMap(pane) {
     if (!map._loaded) return;
     const sz = map.getSize(), pt = (lat, lon) => map.latLngToContainerPoint([lat, lon]);
     let out = "";
-    for (let lon = 12; lon <= 26; lon++) {
-      const a = pt(50, lon), b = pt(54, lon), x = a.x + (b.x - a.x) * (8 - a.y) / (b.y - a.y);
-      if (x > 30 && x < sz.x - 30) out += `<span style="left:${Math.round(x)}px;top:2px">${lon}°</span>`;
+    // przy bardzo małym zoomie (południki gęściej niż szerokość opisu) bez opisów długości, żeby nie zlewały się w jeden napis
+    for (let lon = 12; lon <= 26 && pt(57, 20).x - pt(57, 19).x >= 28; lon++) {
+      // po oddaleniu, gdy siatka nie sięga górnej krawędzi: opis nad końcem południka (57°N), a nie przy krawędzi
+      const a = pt(50, lon), b = pt(57, lon), y = Math.max(8, b.y - 8), x = a.x + (b.x - a.x) * (y - a.y) / (b.y - a.y);
+      if (x > 30 && x < sz.x - 30) out += `<span style="left:${Math.round(x)}px;top:${Math.round(y - 6)}px">${lon}°</span>`;
     }
     for (let lat = 47; lat <= 57; lat++) {
       const pts = steps(10, 28, 0.1).map((lon) => pt(lat, lon));
@@ -183,9 +189,19 @@ function qnhMap(pane) {
       .forEach(([k, className, o]) => L.geoJSON(polys(k), { pane: "qtma", interactive: false, style: { className, ...o } }).addTo(layers.tma));
     data.tmas.filter((t) => t.outline).forEach((t) => L.geoJSON(t.outline, { pane: "qtma", interactive: false, style: { className: "qr-tline" } }).addTo(layers.tma));
     if (data.coast) L.geoJSON(data.coast, { pane: "qgrid", interactive: false, style: { className: "qr-coast" } }).addTo(layers.base);
-    // granice rejonów (zielone), pasów 15–17 (pomarańczowe: na mapie widać tylko linie 53°N i 51°N, resztę zakrywa FIR) i FIR
-    data.regions.forEach((r) => L.geoJSON(r.geometry, { pane: r.band ? "qband" : "qreg", interactive: false,
-      style: { className: r.band ? "qr-bline" : "qr-rline", fill: false } }).addTo(layers.base));
+    // granice rejonów (zielone), z obrysów pasów 15–17 tylko pomarańczowe linie 53°N i 51°N (reszta obrysu to granica FIR,
+    // a szersza linia pasa wystawałaby spod niej pomarańczową obwódką) i FIR
+    data.regions.filter((r) => !r.band).forEach((r) => L.geoJSON(r.geometry, { pane: "qreg", interactive: false,
+      style: { className: "qr-rline", fill: false } }).addTo(layers.base));
+    const par = [];
+    data.regions.filter((r) => r.band).flatMap((r) => (r.geometry.type === "Polygon" ? [r.geometry.coordinates] : r.geometry.coordinates))
+      .forEach((poly) => {
+        let run = [];
+        const flush = () => { if (run.length > 1) par.push(run); run = []; };
+        poly[0].forEach(([lon, lat]) => ([51, 53].some((p) => Math.abs(lat - p) < 1e-6) ? run.push([lat, lon]) : flush()));
+        flush();
+      });
+    if (par.length) L.polyline(par, { pane: "qband", interactive: false, className: "qr-bline" }).addTo(layers.base);
     if (data.fir) L.geoJSON(data.fir, { pane: "qfir", interactive: false, style: { className: "qr-fir", fill: false } }).addTo(layers.base);
 
     // numery rejonów (15–17 pomarańczowe jak na mapie AIP) i etykiety SEKTOR n
